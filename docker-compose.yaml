@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql-container-paymentprocessing
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: n3u3da!
+      MYSQL_DATABASE: PaymentProcessing
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    networks:
+      - springboot-network
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pn3u3da!"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  springboot-app:
+    build: .
+    container_name: springboot-container-paymentprocessing
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/PaymentProcessing?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USER: root
+      DB_PASS: n3u3da!
+      SERVER_PORT: 8082
+
+    ports:
+      - "8082:8082"
+
+    networks:
+      - springboot-network
+
+volumes:
+  mysql-data:
+
+networks:
+  springboot-network:
