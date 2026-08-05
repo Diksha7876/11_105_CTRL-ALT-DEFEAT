@@ -12,10 +12,14 @@ public class Payment {
     private PaymentStatus status;
     private Long version;
     private PaymentType paymentType;
+    private PaymentMethod paymentMethod;
+    private CardType cardType;
     private UUID payerId;
     private String invoiceId;
     private UUID sourceAccountId;
     private UUID beneficiaryId;
+    private String cardLast4;
+    private String cardHolderName;
     private String idempotencyKey;
     private Instant createdAt;
     private Instant updatedAt;
@@ -76,6 +80,22 @@ public class Payment {
         this.paymentType = paymentType;
     }
 
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public CardType getCardType() {
+        return cardType;
+    }
+
+    public void setCardType(CardType cardType) {
+        this.cardType = cardType;
+    }
+
     public UUID getPayerId() {
         return payerId;
     }
@@ -106,6 +126,22 @@ public class Payment {
 
     public void setBeneficiaryId(UUID beneficiaryId) {
         this.beneficiaryId = beneficiaryId;
+    }
+
+    public String getCardLast4() {
+        return cardLast4;
+    }
+
+    public void setCardLast4(String cardLast4) {
+        this.cardLast4 = cardLast4;
+    }
+
+    public String getCardHolderName() {
+        return cardHolderName;
+    }
+
+    public void setCardHolderName(String cardHolderName) {
+        this.cardHolderName = cardHolderName;
     }
 
     public String getIdempotencyKey() {

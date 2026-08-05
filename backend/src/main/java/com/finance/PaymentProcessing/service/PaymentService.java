@@ -1,6 +1,7 @@
 package com.finance.PaymentProcessing.service;
 
 import com.finance.PaymentProcessing.dto.*;
+import com.finance.PaymentProcessing.exception.BadRequestException;
 import com.finance.PaymentProcessing.exception.ConflictException;
 import com.finance.PaymentProcessing.exception.NotFoundException;
 import com.finance.PaymentProcessing.model.*;
@@ -31,12 +32,34 @@ public class PaymentService {
                 .orElseGet(() -> {
                     validationService.validateAmount(request.amount());
                     validationService.validateCurrency(request.currency());
-                    validationService.validateBeneficiary(request.beneficiaryId());
-                    validationService.validateSourceAccount(request.sourceAccountId(), request.beneficiaryId());
-                    validationService.validatePaymentDetails(request.paymentType(), request.invoiceId());
-                    String invoiceId = request.paymentType() == PaymentType.BILL_PAYMENT ? request.invoiceId().trim()
+                    if (request.paymentMethod() == PaymentMethod.NET_BANKING && request.payerId() == null) {
+                        throw new BadRequestException("VALIDATION_FAILED", "payerId is required for net banking");
+                    }
+
+                    validationService.validateMethodSpecificDetails(
+                            request.paymentMethod(),
+                            request.beneficiaryId(),
+                            request.cardType(),
+                            request.cardHolderName(),
+                            request.cardNumber(),
+                            request.expiryMonth(),
+                            request.expiryYear(),
+                            request.cvv());
+
+                    if (request.paymentMethod() == PaymentMethod.NET_BANKING) {
+                        validationService.validateBeneficiary(request.beneficiaryId());
+                    }
+
+                    PaymentType paymentType = request.paymentType() != null
+                            ? request.paymentType()
+                            : PaymentType.BENEFICIARY_TRANSFER;
+
+                    validationService.validatePaymentDetails(paymentType, request.invoiceId());
+                    String invoiceId = paymentType == PaymentType.BILL_PAYMENT && request.invoiceId() != null
+                            ? request.invoiceId().trim()
                             : null;
                     if (invoiceId != null
+                            && request.payerId() != null
                             && paymentRepository.findByPayerIdAndInvoiceId(request.payerId(), invoiceId).isPresent()) {
                         throw new ConflictException("DUPLICATE_PAYMENT",
                                 "This invoice has already been paid by this payer");
@@ -44,11 +67,21 @@ public class PaymentService {
                     Payment payment = new Payment();
                     payment.setAmount(request.amount());
                     payment.setCurrency(request.currency().toUpperCase());
-                    payment.setReference(request.reference());
-                    payment.setSourceAccountId(request.sourceAccountId());
+                    payment.setReference(resolveReference(request));
+                    payment.setSourceAccountId(null);
                     payment.setBeneficiaryId(request.beneficiaryId());
                     payment.setPayerId(request.payerId());
-                    payment.setPaymentType(request.paymentType());
+                    payment.setPaymentType(paymentType);
+                    payment.setPaymentMethod(request.paymentMethod());
+                    payment.setCardType(request.cardType());
+                    if (request.paymentMethod() == PaymentMethod.CARD) {
+                        String normalizedCard = validationService.normalizeCardNumber(request.cardNumber());
+                        payment.setCardLast4(normalizedCard.substring(normalizedCard.length() - 4));
+                        payment.setCardHolderName(request.cardHolderName().trim());
+                    } else {
+                        payment.setCardLast4(null);
+                        payment.setCardHolderName(null);
+                    }
                     payment.setInvoiceId(invoiceId);
                     payment.setIdempotencyKey(idempotencyKey);
                     payment.setStatus(PaymentStatus.CREATED);
@@ -88,8 +121,16 @@ public class PaymentService {
     private PaymentResponse toResponse(Payment p) {
         return new PaymentResponse(
                 p.getPaymentId(), p.getAmount(), p.getCurrency(), p.getReference(), p.getStatus(),
-                p.getPaymentType(), p.getPayerId(), p.getInvoiceId(),
+                p.getPaymentType(), p.getPaymentMethod(), p.getCardType(), p.getPayerId(), p.getInvoiceId(),
                 p.getSourceAccountId(), p.getBeneficiaryId(),
+                p.getCardLast4(), p.getCardHolderName(),
                 p.getCreatedAt(), p.getUpdatedAt());
+    }
+
+    private String resolveReference(PaymentRequest request) {
+        if (request.reference() != null && !request.reference().isBlank()) {
+            return request.reference().trim();
+        }
+        return request.paymentMethod() == PaymentMethod.CARD ? "Card payment" : "Net banking payment";
     }
 }
