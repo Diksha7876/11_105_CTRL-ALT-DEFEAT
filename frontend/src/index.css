@@ -1,0 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  color: #111111;
+  background: #fdf8ff;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Space Grotesk", "Sora", ui-sans-serif, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.btn-primary {
+  @apply rounded-lg bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-outline {
+  @apply rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800;
+}
+
+.field {
+  @apply flex flex-col gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-200;
+}
+
+.field > legend,
+.field > span {
+  @apply text-sm font-semibold text-zinc-700 dark:text-zinc-200;
+}
+
+.input {
+  @apply rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-fuchsia-500 focus:ring-2 focus:ring-fuchsia-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-fuchsia-400 dark:focus:ring-fuchsia-900;
+}
+
+.error-text {
+  @apply text-xs text-rose-600 dark:text-rose-400;
+}
+
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-outline {
+    @apply w-full justify-center text-center;
+  }
+}
