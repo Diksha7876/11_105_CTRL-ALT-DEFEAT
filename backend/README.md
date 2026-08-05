@@ -3,6 +3,25 @@
 ## Overview
 This project defines a payment processing system that supports multiple payment channels, prevents duplicate payments, validates transactions, handles failures reliably, and provides a simple shared interface for single user.
 
+## Run After Folder Restructure
+
+All backend commands should be run from the `backend` folder.
+
+### Windows PowerShell
+
+```powershell
+cd backend
+.\mvnw.cmd clean package -DskipTests
+.\mvnw.cmd spring-boot:run
+```
+
+### Docker
+
+```powershell
+cd backend
+docker-compose up --build
+```
+
 ## Meeting Notes for 30-07-2026
 Multiple payment channels need to be supported, including UPI, Card Payments, and NetBanking.
 
