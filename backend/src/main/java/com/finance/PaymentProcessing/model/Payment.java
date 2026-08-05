@@ -20,6 +20,7 @@ public class Payment {
     private UUID beneficiaryId;
     private String cardLast4;
     private String cardHolderName;
+    private String upiId;
     private String idempotencyKey;
     private Instant createdAt;
     private Instant updatedAt;
@@ -142,6 +143,14 @@ public class Payment {
 
     public void setCardHolderName(String cardHolderName) {
         this.cardHolderName = cardHolderName;
+    }
+
+    public String getUpiId() {
+        return upiId;
+    }
+
+    public void setUpiId(String upiId) {
+        this.upiId = upiId;
     }
 
     public String getIdempotencyKey() {

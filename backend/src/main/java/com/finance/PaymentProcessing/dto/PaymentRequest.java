@@ -24,6 +24,7 @@ public record PaymentRequest(
                 String expiryMonth,
                 String expiryYear,
                 String cvv,
+                String upiId,
                 PaymentType paymentType,
                 String invoiceId) {
 }

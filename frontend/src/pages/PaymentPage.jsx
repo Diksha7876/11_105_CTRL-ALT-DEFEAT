@@ -22,6 +22,7 @@ const TABS = [
 // =========================================================
 const cardNumberDigitsRegex = /^\d{13,19}$/;
 const cvvRegex = /^\d{3,4}$/;
+const upiIdRegex = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
 
 function onlyDigits(value) {
   return String(value ?? "").replace(/\D/g, "");
@@ -102,6 +103,12 @@ function validatePaymentForm(form, payerId, beneficiaries) {
     }
   }
 
+  if (form.paymentMethod === "UPI") {
+    if (!form.upiId.trim() || !upiIdRegex.test(form.upiId.trim())) {
+      errors.upiId = "Enter a valid UPI ID (example@bank)";
+    }
+  }
+
   return errors;
 }
 
@@ -117,6 +124,7 @@ const initialPaymentForm = {
   expiryMonth: "",
   expiryYear: "",
   cvv: "",
+  upiId: "",
 };
 
 function CreatePaymentSection() {
@@ -176,14 +184,16 @@ function CreatePaymentSection() {
       ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
       ...(form.paymentMethod === "NET_BANKING"
         ? { beneficiaryId: form.beneficiaryId }
-        : {
+        : form.paymentMethod === "CARD"
+        ? {
             cardType: form.cardType,
             cardHolderName: form.cardHolderName.trim(),
             cardNumber: onlyDigits(form.cardNumber),
             expiryMonth: String(Number(form.expiryMonth)),
             expiryYear: form.expiryYear.trim(),
             cvv: form.cvv.trim(),
-          }),
+          }
+        : { upiId: form.upiId.trim().toLowerCase() }),
     };
     try {
       const response = await api.post("/api/payments", body, {
@@ -221,6 +231,7 @@ function CreatePaymentSection() {
                 {[
                   ["CARD", "Card Payment"],
                   ["NET_BANKING", "Net Banking"],
+                  ["UPI", "UPI Payment"],
                 ].map(([value, label]) => (
                   <label key={value} className="inline-flex items-center gap-2 text-sm">
                     <input
@@ -239,6 +250,7 @@ function CreatePaymentSection() {
                           expiryMonth: "",
                           expiryYear: "",
                           cvv: "",
+                          upiId: "",
                         }))
                       }
                     />
@@ -353,6 +365,20 @@ function CreatePaymentSection() {
               </>
             )}
 
+            {form.paymentMethod === "UPI" && (
+              <label className="field md:col-span-2">
+                <span>UPI ID</span>
+                <input
+                  className="input"
+                  value={form.upiId}
+                  onChange={(e) => setForm((p) => ({ ...p, upiId: e.target.value }))}
+                  placeholder="example@okhdfcbank"
+                  required
+                />
+                {formErrors.upiId && <p className="error-text">{formErrors.upiId}</p>}
+              </label>
+            )}
+
             <label className="field">
               <span>Amount</span>
               <input
@@ -421,7 +447,11 @@ function CreatePaymentSection() {
               <div className="grid grid-cols-[150px_1fr] gap-2">
                 <dt className="font-semibold text-zinc-500 dark:text-zinc-400">method</dt>
                 <dd className="break-all">
-                  {createdPayment?.paymentMethod === "CARD" ? "Card Payment" : "Net Banking"}
+                  {createdPayment?.paymentMethod === "CARD"
+                    ? "Card Payment"
+                    : createdPayment?.paymentMethod === "UPI"
+                    ? "UPI Payment"
+                    : "Net Banking"}
                 </dd>
               </div>
               {[
@@ -433,6 +463,7 @@ function CreatePaymentSection() {
                 "cardType",
                 "cardLast4",
                 "cardHolderName",
+                "upiId",
                 "beneficiaryId",
                 "payerId",
               ].map((key) => (

@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS payments (
     status          VARCHAR(50)     NOT NULL COMMENT 'CREATED | VALIDATED | SENT | COMPLETED | FAILED',
     version         BIGINT          NULL,
     payment_type    VARCHAR(50)     NOT NULL COMMENT 'BILL_PAYMENT | BENEFICIARY_TRANSFER',
-    payment_method  VARCHAR(50)     NOT NULL COMMENT 'CARD | NET_BANKING',
+    payment_method  VARCHAR(50)     NOT NULL COMMENT 'CARD | NET_BANKING | UPI',
     card_type       VARCHAR(50)     NULL COMMENT 'CREDIT_CARD | DEBIT_CARD',
     payer_id        CHAR(36)        NULL,
     invoice_id      VARCHAR(255)    NULL,
@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS payments (
     beneficiary_id  CHAR(36)        NULL,
     card_last4      VARCHAR(4)      NULL,
     card_holder_name VARCHAR(255)   NULL,
+    upi_id          VARCHAR(320)    NULL,
     idempotency_key VARCHAR(255)    NOT NULL,
     created_at      DATETIME(6)     NOT NULL,
     updated_at      DATETIME(6)     NOT NULL,
@@ -68,6 +69,23 @@ SET @sql = (
         ),
         'SELECT 1',
         "ALTER TABLE payments ADD COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'NET_BANKING'"
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'payments'
+              AND column_name = 'upi_id'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payments ADD COLUMN upi_id VARCHAR(320) NULL'
     )
 );
 PREPARE stmt FROM @sql;
