@@ -6,6 +6,7 @@ import { getStoredTheme, setStoredTheme } from "../lib/storage";
 
 const navItems = [
   { to: "/", label: "Dashboard" },
+  { to: "/profile", label: "Profile" },
   { to: "/payment", label: "Payment" },
   { to: "/incoming-payments", label: "Incoming Payments" },
   { to: "/payment-history", label: "Payment History" },

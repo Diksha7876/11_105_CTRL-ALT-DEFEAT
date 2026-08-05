@@ -17,6 +17,7 @@ public record PaymentRequest(
                 String reference,
                 UUID payerId,
                 @NotNull PaymentMethod paymentMethod,
+                UUID sourceAccountId,
                 UUID beneficiaryId,
                 CardType cardType,
                 String cardHolderName,

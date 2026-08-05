@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from "uuid";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import AsyncState from "../components/AsyncState";
 import PageHeader from "../components/PageHeader";
 import SkeletonTable from "../components/SkeletonTable";
 import { useCurrentUser } from "../context/UserContext";
 import { api, getErrorText } from "../lib/api";
-import { CURRENCIES } from "../lib/constants";
+import { CURRENCIES, INR_PER_CURRENCY } from "../lib/constants";
+import { formatCurrency } from "../lib/formatters";
 
 const accountNumberRegex = /^[A-Za-z0-9]{6,34}$/;
 const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -43,7 +44,24 @@ function isLuhnValid(digits) {
   return sum % 10 === 0;
 }
 
-function validatePaymentForm(form, payerId, beneficiaries) {
+function normalizeCurrency(currency) {
+  return String(currency || "INR").trim().toUpperCase();
+}
+
+function convertAmountToInr(amount, currency) {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return null;
+  }
+  const normalizedCurrency = normalizeCurrency(currency);
+  const rate = Number(INR_PER_CURRENCY[normalizedCurrency]);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return null;
+  }
+  return Number((numericAmount * rate).toFixed(2));
+}
+
+function validatePaymentForm(form, payerId, beneficiaries, ownedAccounts) {
   const errors = {};
   const amount = Number(form.amount);
 
@@ -59,6 +77,19 @@ function validatePaymentForm(form, payerId, beneficiaries) {
   }
 
   if (!form.currency) errors.currency = "Currency is required";
+
+  if (!form.sourceAccountId) {
+    errors.sourceAccountId = "Select source account";
+  } else if (!ownedAccounts.some((a) => a.accountId === form.sourceAccountId)) {
+    errors.sourceAccountId = "Selected source account is invalid";
+  }
+
+  const selectedAccount = ownedAccounts.find((a) => a.accountId === form.sourceAccountId) ?? null;
+  const debitInInr = convertAmountToInr(form.amount, form.currency);
+  const available = Number(selectedAccount?.balanceInInr ?? 0);
+  if (selectedAccount && debitInInr !== null && available < debitInInr) {
+    errors.amount = `Insufficient balance. Required INR ${debitInInr.toFixed(2)}, available INR ${available.toFixed(2)}`;
+  }
 
   if (form.paymentMethod === "NET_BANKING") {
     if (!payerId) {
@@ -114,6 +145,7 @@ function validatePaymentForm(form, payerId, beneficiaries) {
 
 const initialPaymentForm = {
   paymentMethod: "CARD",
+  sourceAccountId: "",
   beneficiaryId: "",
   amount: "",
   currency: "INR",
@@ -132,6 +164,7 @@ function CreatePaymentSection() {
   const payerId = currentUser?.payerId ?? null;
   const [form, setForm] = useState(initialPaymentForm);
   const [formErrors, setFormErrors] = useState({});
+  const [accounts, setAccounts] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -143,7 +176,11 @@ function CreatePaymentSection() {
     setLoading(true);
     setError("");
     try {
-      const beneficiariesRes = await api.get("/api/beneficiaries");
+      const [accountsRes, beneficiariesRes] = await Promise.all([
+        api.get("/api/accounts"),
+        api.get("/api/beneficiaries"),
+      ]);
+      setAccounts(accountsRes.data ?? []);
       setBeneficiaries(beneficiariesRes.data ?? []);
     } catch (err) {
       const text = getErrorText(err);
@@ -158,8 +195,31 @@ function CreatePaymentSection() {
     loadDependencies();
   }, [loadDependencies]);
 
+  const ownedAccounts = useMemo(() => {
+    return (accounts ?? []).filter((account) => {
+      if (!payerId) {
+        return true;
+      }
+      const ownerPayerId = account.payerId ?? account.ownerPayerId ?? account.userPayerId ?? null;
+      if (!ownerPayerId) {
+        return true;
+      }
+      return String(ownerPayerId) === String(payerId);
+    });
+  }, [accounts, payerId]);
+
+  const selectedSourceAccount = useMemo(
+    () => ownedAccounts.find((account) => account.accountId === form.sourceAccountId) ?? null,
+    [ownedAccounts, form.sourceAccountId]
+  );
+
+  const convertedDebitInInr = useMemo(
+    () => convertAmountToInr(form.amount, form.currency),
+    [form.amount, form.currency]
+  );
+
   const validate = () => {
-    const errors = validatePaymentForm(form, payerId, beneficiaries);
+    const errors = validatePaymentForm(form, payerId, beneficiaries, ownedAccounts);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -167,7 +227,7 @@ function CreatePaymentSection() {
   const canSubmit =
     !loading &&
     !submitting &&
-    Object.keys(validatePaymentForm(form, payerId, beneficiaries)).length === 0;
+    Object.keys(validatePaymentForm(form, payerId, beneficiaries, ownedAccounts)).length === 0;
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -180,10 +240,11 @@ function CreatePaymentSection() {
       currency: form.currency,
       paymentMethod: form.paymentMethod,
       paymentType: "BENEFICIARY_TRANSFER",
+      sourceAccountId: form.sourceAccountId,
       ...(payerId ? { payerId } : {}),
       ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
       ...(form.paymentMethod === "NET_BANKING"
-        ? { beneficiaryId: form.beneficiaryId }
+          ? { beneficiaryId: form.beneficiaryId }
         : form.paymentMethod === "CARD"
         ? {
             cardType: form.cardType,
@@ -225,6 +286,26 @@ function CreatePaymentSection() {
           noValidate
         >
           <div className="grid gap-4 md:grid-cols-2">
+            <label className="field md:col-span-2">
+              <span>Source Account</span>
+              <select
+                className="input"
+                value={form.sourceAccountId}
+                onChange={(e) => setForm((p) => ({ ...p, sourceAccountId: e.target.value }))}
+                required
+              >
+                <option value="">Select source account</option>
+                {ownedAccounts.map((account) => (
+                  <option key={account.accountId} value={account.accountId}>
+                    {account.accountNumber} | Balance {formatCurrency(account.balanceInInr, "INR")}
+                  </option>
+                ))}
+              </select>
+              {formErrors.sourceAccountId && (
+                <p className="error-text">{formErrors.sourceAccountId}</p>
+              )}
+            </label>
+
             <fieldset className="field md:col-span-2">
               <legend>Payment Method</legend>
               <div className="mt-2 flex flex-wrap gap-4">
@@ -406,6 +487,20 @@ function CreatePaymentSection() {
               </select>
             </label>
 
+            {selectedSourceAccount && convertedDebitInInr !== null && (
+              <div className="field md:col-span-2 rounded-lg border border-sky-300/60 bg-sky-50/70 px-3 py-2 text-sm text-sky-900 dark:border-sky-800/60 dark:bg-sky-900/30 dark:text-sky-100">
+                <p>
+                  INR balance debit for this payment:
+                  <span className="ml-2 font-semibold">
+                    {formatCurrency(convertedDebitInInr, "INR")}
+                  </span>
+                </p>
+                <p className="mt-1 text-xs">
+                  Available balance: {formatCurrency(selectedSourceAccount.balanceInInr, "INR")}
+                </p>
+              </div>
+            )}
+
             <label className="field md:col-span-2">
               <span>Reference</span>
               <input
@@ -464,6 +559,7 @@ function CreatePaymentSection() {
                 "cardLast4",
                 "cardHolderName",
                 "upiId",
+                "sourceAccountId",
                 "beneficiaryId",
                 "payerId",
               ].map((key) => (
@@ -483,9 +579,17 @@ function CreatePaymentSection() {
 // =========================================================
 // Source Accounts Section
 // =========================================================
-const initialAccountForm = { accountId: "", accountNumber: "", accountHolderName: "" };
+const initialAccountForm = {
+  accountId: "",
+  accountNumber: "",
+  accountHolderName: "",
+  openingBalanceInr: "50000",
+  accountType: "SAVINGS",
+};
 
 function SourceAccountsSection() {
+  const { currentUser } = useCurrentUser();
+  const payerId = currentUser?.payerId ?? null;
   const [form, setForm] = useState(initialAccountForm);
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -525,6 +629,17 @@ function SourceAccountsSection() {
     if (!form.accountHolderName.trim()) {
       errors.accountHolderName = "Account holder name is required";
     }
+
+    if (!form.openingBalanceInr) {
+      errors.openingBalanceInr = "Opening balance is required";
+    } else if (!(Number(form.openingBalanceInr) >= 0)) {
+      errors.openingBalanceInr = "Opening balance cannot be negative";
+    }
+
+    if (!form.accountType) {
+      errors.accountType = "Account type is required";
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -538,6 +653,9 @@ function SourceAccountsSection() {
         accountId: form.accountId.trim(),
         accountNumber: form.accountNumber.trim(),
         accountHolderName: form.accountHolderName.trim(),
+        payerId,
+        openingBalanceInr: Number(form.openingBalanceInr),
+        accountType: form.accountType,
       });
       toast.success("Source account created");
       setForm(initialAccountForm);
@@ -601,6 +719,34 @@ function SourceAccountsSection() {
               <p className="error-text">{formErrors.accountHolderName}</p>
             )}
           </label>
+          <label className="field">
+            <span>Account Type</span>
+            <select
+              className="input"
+              value={form.accountType}
+              onChange={(e) => setForm((p) => ({ ...p, accountType: e.target.value }))}
+            >
+              <option value="SAVINGS">Savings</option>
+              <option value="CURRENT">Current</option>
+              <option value="SALARY">Salary</option>
+            </select>
+            {formErrors.accountType && <p className="error-text">{formErrors.accountType}</p>}
+          </label>
+          <label className="field">
+            <span>Opening Balance (INR)</span>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.openingBalanceInr}
+              onChange={(e) => setForm((p) => ({ ...p, openingBalanceInr: e.target.value }))}
+              required
+            />
+            {formErrors.openingBalanceInr && (
+              <p className="error-text">{formErrors.openingBalanceInr}</p>
+            )}
+          </label>
           <div className="md:col-span-2">
             <button type="submit" className="btn-primary" disabled={submitting}>
               {submitting ? "Creating..." : "Create Account"}
@@ -625,6 +771,8 @@ function SourceAccountsSection() {
                 <th className="pb-2">Account ID</th>
                 <th className="pb-2">Account Number</th>
                 <th className="pb-2">Holder Name</th>
+                <th className="pb-2">Type</th>
+                <th className="pb-2">Balance (INR)</th>
                 <th className="pb-2">Active</th>
               </tr>
             </thead>
@@ -637,6 +785,8 @@ function SourceAccountsSection() {
                   <td className="py-3 font-medium">{account.accountId}</td>
                   <td className="py-3">{account.accountNumber}</td>
                   <td className="py-3">{account.accountHolderName}</td>
+                  <td className="py-3">{account.accountType ?? "SAVINGS"}</td>
+                  <td className="py-3">{formatCurrency(account.balanceInInr, "INR")}</td>
                   <td className="py-3">{String(account.active ?? account.isActive ?? true)}</td>
                 </tr>
               ))}

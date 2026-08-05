@@ -8,10 +8,64 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     account_id          CHAR(36)        NOT NULL,
     account_number      VARCHAR(34)     NOT NULL,
     account_holder_name VARCHAR(255)    NOT NULL,
+    payer_id            CHAR(36)        NULL,
+    account_type        VARCHAR(30)     NOT NULL DEFAULT 'SAVINGS',
+    balance_in_inr      DECIMAL(19,2)   NOT NULL DEFAULT 0.00,
     active              TINYINT(1)      NOT NULL DEFAULT 1,
     PRIMARY KEY (account_id),
     UNIQUE KEY uk_bank_accounts_account_number (account_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'bank_accounts'
+              AND column_name = 'payer_id'
+        ),
+        'SELECT 1',
+        'ALTER TABLE bank_accounts ADD COLUMN payer_id CHAR(36) NULL'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'bank_accounts'
+              AND column_name = 'account_type'
+        ),
+        'SELECT 1',
+        "ALTER TABLE bank_accounts ADD COLUMN account_type VARCHAR(30) NOT NULL DEFAULT 'SAVINGS'"
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'bank_accounts'
+              AND column_name = 'balance_in_inr'
+        ),
+        'SELECT 1',
+        'ALTER TABLE bank_accounts ADD COLUMN balance_in_inr DECIMAL(19,2) NOT NULL DEFAULT 0.00'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS beneficiaries (
     beneficiary_id  CHAR(36)        NOT NULL,

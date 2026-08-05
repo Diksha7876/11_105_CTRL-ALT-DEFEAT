@@ -8,6 +8,7 @@ import PaymentDetailsPage from "./pages/PaymentDetailsPage";
 import PaymentHistoryPage from "./pages/PaymentHistoryPage";
 import PaymentPage from "./pages/PaymentPage";
 import PaymentsPage from "./pages/PaymentsPage";
+import UserProfilePage from "./pages/UserProfilePage";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="payment" element={<PaymentPage />} />
+        <Route path="profile" element={<UserProfilePage />} />
         <Route path="incoming-payments" element={<IncomingPaymentsPage />} />
         <Route path="payment-history" element={<PaymentsPage />} />
         <Route path="payment-history/:paymentId" element={<PaymentDetailsPage />} />

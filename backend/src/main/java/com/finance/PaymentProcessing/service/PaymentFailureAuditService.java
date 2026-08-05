@@ -5,9 +5,11 @@ import com.finance.PaymentProcessing.exception.BadRequestException;
 import com.finance.PaymentProcessing.exception.ConflictException;
 import com.finance.PaymentProcessing.exception.NotFoundException;
 import com.finance.PaymentProcessing.model.Beneficiary;
+import com.finance.PaymentProcessing.model.PaymentMethod;
 import com.finance.PaymentProcessing.model.Payment;
 import com.finance.PaymentProcessing.model.PaymentStatus;
 import com.finance.PaymentProcessing.model.PaymentType;
+import com.finance.PaymentProcessing.repository.BankAccountRepository;
 import com.finance.PaymentProcessing.repository.BeneficiaryRepository;
 import com.finance.PaymentProcessing.repository.PaymentRepository;
 import java.math.BigDecimal;
@@ -20,14 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentFailureAuditService {
 
     private final PaymentRepository paymentRepository;
+    private final BankAccountRepository bankAccountRepository;
     private final BeneficiaryRepository beneficiaryRepository;
     private final HistoryService historyService;
 
     public PaymentFailureAuditService(
             PaymentRepository paymentRepository,
+            BankAccountRepository bankAccountRepository,
             BeneficiaryRepository beneficiaryRepository,
             HistoryService historyService) {
         this.paymentRepository = paymentRepository;
+        this.bankAccountRepository = bankAccountRepository;
         this.beneficiaryRepository = beneficiaryRepository;
         this.historyService = historyService;
     }
@@ -40,14 +45,20 @@ public class PaymentFailureAuditService {
         }
 
         try {
+            UUID sourceAccountId = resolveSourceAccountId(request.sourceAccountId());
             Payment failed = new Payment();
             failed.setAmount(sanitizeAmount(request.amount()));
             failed.setCurrency(sanitizeCurrency(request.currency()));
             failed.setReference(sanitizeReference(request.reference()));
-            failed.setSourceAccountId(null);
+            failed.setSourceAccountId(sourceAccountId);
             failed.setBeneficiaryId(beneficiaryId);
             failed.setPayerId(request.payerId());
-            failed.setPaymentType(request.paymentType() != null ? request.paymentType() : PaymentType.BILL_PAYMENT);
+            failed.setPaymentType(request.paymentType() != null ? request.paymentType() : PaymentType.BENEFICIARY_TRANSFER);
+            failed.setPaymentMethod(request.paymentMethod() != null ? request.paymentMethod() : PaymentMethod.NET_BANKING);
+            failed.setCardType(request.cardType());
+            failed.setCardHolderName(sanitizeCardHolderName(request.cardHolderName()));
+            failed.setCardLast4(sanitizeCardLast4(request.cardNumber()));
+            failed.setUpiId(sanitizeUpiId(request.upiId()));
             failed.setInvoiceId(null);
             failed.setIdempotencyKey(idempotencyKey + "-FAILED-" + UUID.randomUUID());
             failed.setStatus(PaymentStatus.FAILED);
@@ -68,6 +79,13 @@ public class PaymentFailureAuditService {
                 .map(Beneficiary::getBeneficiaryId)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private UUID resolveSourceAccountId(UUID requestedId) {
+        if (requestedId != null && bankAccountRepository.existsById(requestedId)) {
+            return requestedId;
+        }
+        return null;
     }
 
     private BigDecimal sanitizeAmount(BigDecimal amount) {
@@ -93,6 +111,31 @@ public class PaymentFailureAuditService {
             return "FAILED_VALIDATION";
         }
         return reference.length() > 255 ? reference.substring(0, 255) : reference;
+    }
+
+    private String sanitizeCardLast4(String cardNumber) {
+        if (cardNumber == null || cardNumber.isBlank()) {
+            return null;
+        }
+        String digits = cardNumber.replaceAll("\\D", "");
+        if (digits.length() < 4) {
+            return null;
+        }
+        return digits.substring(digits.length() - 4);
+    }
+
+    private String sanitizeCardHolderName(String cardHolderName) {
+        if (cardHolderName == null || cardHolderName.isBlank()) {
+            return null;
+        }
+        return cardHolderName.trim();
+    }
+
+    private String sanitizeUpiId(String upiId) {
+        if (upiId == null || upiId.isBlank()) {
+            return null;
+        }
+        return upiId.trim().toLowerCase();
     }
 
     private String resolveErrorCode(RuntimeException ex) {
