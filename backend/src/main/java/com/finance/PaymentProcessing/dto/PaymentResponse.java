@@ -11,6 +11,6 @@ import java.util.UUID;
 public record PaymentResponse(UUID paymentId, BigDecimal amount, String currency, String reference,
         PaymentStatus status, PaymentType paymentType, PaymentMethod paymentMethod, CardType cardType,
         UUID payerId, String invoiceId, UUID sourceAccountId, UUID beneficiaryId,
-        String cardLast4, String cardHolderName,
+        String cardLast4, String cardHolderName, String upiId,
         Instant createdAt, Instant updatedAt) {
 }

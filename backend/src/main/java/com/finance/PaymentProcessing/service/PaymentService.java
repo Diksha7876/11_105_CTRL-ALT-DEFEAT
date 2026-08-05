@@ -52,7 +52,8 @@ public class PaymentService {
                             request.cardNumber(),
                             request.expiryMonth(),
                             request.expiryYear(),
-                            request.cvv());
+                            request.cvv(),
+                            request.upiId());
 
                     if (request.paymentMethod() == PaymentMethod.NET_BANKING) {
                         validationService.validateBeneficiary(request.beneficiaryId());
@@ -86,9 +87,15 @@ public class PaymentService {
                         String normalizedCard = validationService.normalizeCardNumber(request.cardNumber());
                         payment.setCardLast4(normalizedCard.substring(normalizedCard.length() - 4));
                         payment.setCardHolderName(request.cardHolderName().trim());
+                        payment.setUpiId(null);
+                    } else if (request.paymentMethod() == PaymentMethod.UPI) {
+                        payment.setCardLast4(null);
+                        payment.setCardHolderName(null);
+                        payment.setUpiId(request.upiId().trim().toLowerCase());
                     } else {
                         payment.setCardLast4(null);
                         payment.setCardHolderName(null);
+                        payment.setUpiId(null);
                     }
                     payment.setInvoiceId(invoiceId);
                     payment.setIdempotencyKey(idempotencyKey);
@@ -136,7 +143,7 @@ public class PaymentService {
                 p.getPaymentId(), p.getAmount(), p.getCurrency(), p.getReference(), p.getStatus(),
                 p.getPaymentType(), p.getPaymentMethod(), p.getCardType(), p.getPayerId(), p.getInvoiceId(),
                 p.getSourceAccountId(), p.getBeneficiaryId(),
-                p.getCardLast4(), p.getCardHolderName(),
+                p.getCardLast4(), p.getCardHolderName(), p.getUpiId(),
                 p.getCreatedAt(), p.getUpdatedAt());
     }
 
@@ -144,6 +151,10 @@ public class PaymentService {
         if (request.reference() != null && !request.reference().isBlank()) {
             return request.reference().trim();
         }
-        return request.paymentMethod() == PaymentMethod.CARD ? "Card payment" : "Net banking payment";
+        return switch (request.paymentMethod()) {
+            case CARD -> "Card payment";
+            case UPI -> "UPI payment";
+            default -> "Net banking payment";
+        };
     }
 }

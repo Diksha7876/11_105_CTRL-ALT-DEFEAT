@@ -12,11 +12,13 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ValidationService {
     private static final Set<String> SUPPORTED_CURRENCIES = Set.of("INR", "USD", "EUR", "GBP");
+    private static final Pattern UPI_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$");
     private final BeneficiaryRepository beneficiaryRepository;
     private final BankAccountRepository accountRepository;
 
@@ -68,12 +70,17 @@ public class ValidationService {
             String cardNumber,
             String expiryMonth,
             String expiryYear,
-            String cvv) {
+            String cvv,
+            String upiId) {
         if (paymentMethod == null) {
             throw new BadRequestException("paymentMethod is required");
         }
         if (paymentMethod == PaymentMethod.NET_BANKING) {
-            validateNetBankingDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv);
+            validateNetBankingDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv, upiId);
+            return;
+        }
+        if (paymentMethod == PaymentMethod.UPI) {
+            validateUpiDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv, upiId);
             return;
         }
         validateCardDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv);
@@ -85,13 +92,34 @@ public class ValidationService {
             String cardNumber,
             String expiryMonth,
             String expiryYear,
-            String cvv) {
+            String cvv,
+            String upiId) {
         if (beneficiaryId == null) {
             throw new BadRequestException("VALIDATION_FAILED", "beneficiaryId is required for net banking");
         }
         if (cardType != null || hasText(cardHolderName) || hasText(cardNumber)
-                || hasText(expiryMonth) || hasText(expiryYear) || hasText(cvv)) {
+                || hasText(expiryMonth) || hasText(expiryYear) || hasText(cvv) || hasText(upiId)) {
             throw new BadRequestException("VALIDATION_FAILED", "card fields are not allowed for net banking");
+        }
+    }
+
+    private void validateUpiDetails(UUID beneficiaryId,
+            CardType cardType,
+            String cardHolderName,
+            String cardNumber,
+            String expiryMonth,
+            String expiryYear,
+            String cvv,
+            String upiId) {
+        if (beneficiaryId != null) {
+            throw new BadRequestException("VALIDATION_FAILED", "beneficiaryId must not be supplied for UPI payment");
+        }
+        if (cardType != null || hasText(cardHolderName) || hasText(cardNumber)
+                || hasText(expiryMonth) || hasText(expiryYear) || hasText(cvv)) {
+            throw new BadRequestException("VALIDATION_FAILED", "card fields are not allowed for UPI payment");
+        }
+        if (!hasText(upiId) || !UPI_ID_PATTERN.matcher(upiId.trim()).matches()) {
+            throw new BadRequestException("INVALID_UPI", "UPI ID is invalid");
         }
     }
 
