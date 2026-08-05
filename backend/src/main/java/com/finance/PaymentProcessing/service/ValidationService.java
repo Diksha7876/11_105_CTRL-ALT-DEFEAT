@@ -2,11 +2,14 @@ package com.finance.PaymentProcessing.service;
 
 import com.finance.PaymentProcessing.exception.BadRequestException;
 import com.finance.PaymentProcessing.exception.NotFoundException;
+import com.finance.PaymentProcessing.model.CardType;
+import com.finance.PaymentProcessing.model.PaymentMethod;
 import com.finance.PaymentProcessing.model.PaymentStatus;
 import com.finance.PaymentProcessing.model.PaymentType;
 import com.finance.PaymentProcessing.repository.BeneficiaryRepository;
 import com.finance.PaymentProcessing.repository.BankAccountRepository;
 import java.math.BigDecimal;
+import java.time.YearMonth;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -47,12 +50,123 @@ public class ValidationService {
     }
 
     public void validatePaymentDetails(PaymentType paymentType, String invoiceId) {
+        if (paymentType == null) {
+            return;
+        }
         if (paymentType == PaymentType.BILL_PAYMENT && (invoiceId == null || invoiceId.isBlank())) {
             throw new BadRequestException("invoiceId is required for a bill payment");
         }
         if (paymentType == PaymentType.BENEFICIARY_TRANSFER && invoiceId != null && !invoiceId.isBlank()) {
             throw new BadRequestException("invoiceId must not be supplied for a beneficiary transfer");
         }
+    }
+
+    public void validateMethodSpecificDetails(PaymentMethod paymentMethod,
+            UUID beneficiaryId,
+            CardType cardType,
+            String cardHolderName,
+            String cardNumber,
+            String expiryMonth,
+            String expiryYear,
+            String cvv) {
+        if (paymentMethod == null) {
+            throw new BadRequestException("paymentMethod is required");
+        }
+        if (paymentMethod == PaymentMethod.NET_BANKING) {
+            validateNetBankingDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv);
+            return;
+        }
+        validateCardDetails(beneficiaryId, cardType, cardHolderName, cardNumber, expiryMonth, expiryYear, cvv);
+    }
+
+    private void validateNetBankingDetails(UUID beneficiaryId,
+            CardType cardType,
+            String cardHolderName,
+            String cardNumber,
+            String expiryMonth,
+            String expiryYear,
+            String cvv) {
+        if (beneficiaryId == null) {
+            throw new BadRequestException("VALIDATION_FAILED", "beneficiaryId is required for net banking");
+        }
+        if (cardType != null || hasText(cardHolderName) || hasText(cardNumber)
+                || hasText(expiryMonth) || hasText(expiryYear) || hasText(cvv)) {
+            throw new BadRequestException("VALIDATION_FAILED", "card fields are not allowed for net banking");
+        }
+    }
+
+    private void validateCardDetails(UUID beneficiaryId,
+            CardType cardType,
+            String cardHolderName,
+            String cardNumber,
+            String expiryMonth,
+            String expiryYear,
+            String cvv) {
+        if (beneficiaryId != null) {
+            throw new BadRequestException("VALIDATION_FAILED", "beneficiaryId must not be supplied for card payment");
+        }
+        if (cardType == null) {
+            throw new BadRequestException("INVALID_CARD", "Card type is required");
+        }
+        if (!hasText(cardHolderName)) {
+            throw new BadRequestException("INVALID_CARD", "Cardholder name is required");
+        }
+
+        String digits = onlyDigits(cardNumber);
+        if (digits.length() < 13 || digits.length() > 19 || !isLuhnValid(digits)) {
+            throw new BadRequestException("INVALID_CARD", "Card number is invalid");
+        }
+
+        int month;
+        int year;
+        try {
+            month = Integer.parseInt(expiryMonth);
+            year = Integer.parseInt(expiryYear);
+        } catch (Exception ex) {
+            throw new BadRequestException("INVALID_CARD", "Card expiry is invalid");
+        }
+
+        if (month < 1 || month > 12) {
+            throw new BadRequestException("INVALID_CARD", "Expiry month must be between 1 and 12");
+        }
+
+        YearMonth expiry = YearMonth.of(year, month);
+        if (expiry.isBefore(YearMonth.now())) {
+            throw new BadRequestException("INVALID_CARD", "Card is expired");
+        }
+
+        if (!hasText(cvv) || !cvv.trim().matches("\\d{3,4}")) {
+            throw new BadRequestException("INVALID_CARD", "CVV must be 3 or 4 digits");
+        }
+    }
+
+    public String normalizeCardNumber(String cardNumber) {
+        return onlyDigits(cardNumber);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String onlyDigits(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
+    }
+
+    private static boolean isLuhnValid(String digits) {
+        int sum = 0;
+        boolean doubleDigit = false;
+        for (int i = digits.length() - 1; i >= 0; i--) {
+            int n = digits.charAt(i) - '0';
+            if (doubleDigit) {
+                n *= 2;
+                if (n > 9) {
+                    n -= 9;
+                }
+            }
+            sum += n;
+            doubleDigit = !doubleDigit;
+        }
+        return sum % 10 == 0;
     }
 
     public void validateStatusTransition(PaymentStatus oldStatus, PaymentStatus newStatus) {

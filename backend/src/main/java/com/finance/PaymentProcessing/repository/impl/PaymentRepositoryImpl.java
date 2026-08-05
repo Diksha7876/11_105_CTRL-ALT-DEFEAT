@@ -1,7 +1,9 @@
 package com.finance.PaymentProcessing.repository.impl;
 
 import com.finance.PaymentProcessing.exception.ConflictException;
+import com.finance.PaymentProcessing.model.CardType;
 import com.finance.PaymentProcessing.model.Payment;
+import com.finance.PaymentProcessing.model.PaymentMethod;
 import com.finance.PaymentProcessing.model.PaymentStatus;
 import com.finance.PaymentProcessing.model.PaymentType;
 import com.finance.PaymentProcessing.repository.PaymentRepository;
@@ -52,14 +54,27 @@ public class PaymentRepositoryImpl implements PaymentRepository {
         p.setStatus(PaymentStatus.valueOf(rs.getString("status")));
         p.setVersion(rs.getLong("version"));
         p.setPaymentType(PaymentType.valueOf(rs.getString("payment_type")));
-        p.setPayerId(UUID.fromString(rs.getString("payer_id")));
+        p.setPaymentMethod(PaymentMethod.valueOf(rs.getString("payment_method")));
+        String cardType = rs.getString("card_type");
+        p.setCardType(cardType != null ? CardType.valueOf(cardType) : null);
+        p.setPayerId(parseUuid(rs.getString("payer_id")));
         p.setInvoiceId(rs.getString("invoice_id"));
-        p.setSourceAccountId(UUID.fromString(rs.getString("source_account_id")));
-        p.setBeneficiaryId(UUID.fromString(rs.getString("beneficiary_id")));
+        p.setSourceAccountId(parseUuid(rs.getString("source_account_id")));
+        p.setBeneficiaryId(parseUuid(rs.getString("beneficiary_id")));
+        p.setCardLast4(rs.getString("card_last4"));
+        p.setCardHolderName(rs.getString("card_holder_name"));
         p.setIdempotencyKey(rs.getString("idempotency_key"));
         p.setCreatedAt(rs.getTimestamp("created_at").toInstant());
         p.setUpdatedAt(rs.getTimestamp("updated_at").toInstant());
         return p;
+    }
+
+    private static UUID parseUuid(String value) {
+        return value == null ? null : UUID.fromString(value);
+    }
+
+    private static String toDbUuid(UUID value) {
+        return value == null ? null : value.toString();
     }
 
     @Override
@@ -72,8 +87,8 @@ public class PaymentRepositoryImpl implements PaymentRepository {
             payment.setUpdatedAt(now);
             payment.setVersion(0L);
             jdbc.update(
-                "INSERT INTO payments (payment_id, amount, currency, reference, status, version, payment_type, payer_id, invoice_id, source_account_id, beneficiary_id, idempotency_key, created_at, updated_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO payments (payment_id, amount, currency, reference, status, version, payment_type, payment_method, card_type, payer_id, invoice_id, source_account_id, beneficiary_id, card_last4, card_holder_name, idempotency_key, created_at, updated_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 payment.getPaymentId().toString(),
                 payment.getAmount(),
                 payment.getCurrency(),
@@ -81,10 +96,14 @@ public class PaymentRepositoryImpl implements PaymentRepository {
                 payment.getStatus().name(),
                 payment.getVersion(),
                 payment.getPaymentType().name(),
-                payment.getPayerId().toString(),
+                payment.getPaymentMethod().name(),
+                payment.getCardType() != null ? payment.getCardType().name() : null,
+                toDbUuid(payment.getPayerId()),
                 payment.getInvoiceId(),
-                payment.getSourceAccountId().toString(),
-                payment.getBeneficiaryId().toString(),
+                toDbUuid(payment.getSourceAccountId()),
+                toDbUuid(payment.getBeneficiaryId()),
+                payment.getCardLast4(),
+                payment.getCardHolderName(),
                 payment.getIdempotencyKey(),
                 Timestamp.from(payment.getCreatedAt()),
                 Timestamp.from(payment.getUpdatedAt())
@@ -95,7 +114,7 @@ public class PaymentRepositoryImpl implements PaymentRepository {
             long nextVersion = currentVersion + 1;
             Instant now = Instant.now();
             int updated = jdbc.update(
-                "UPDATE payments SET amount = ?, currency = ?, reference = ?, status = ?, version = ?, payment_type = ?, payer_id = ?, invoice_id = ?, source_account_id = ?, beneficiary_id = ?, idempotency_key = ?, updated_at = ? "
+                "UPDATE payments SET amount = ?, currency = ?, reference = ?, status = ?, version = ?, payment_type = ?, payment_method = ?, card_type = ?, payer_id = ?, invoice_id = ?, source_account_id = ?, beneficiary_id = ?, card_last4 = ?, card_holder_name = ?, idempotency_key = ?, updated_at = ? "
                 + "WHERE payment_id = ? AND version = ?",
                 payment.getAmount(),
                 payment.getCurrency(),
@@ -103,10 +122,14 @@ public class PaymentRepositoryImpl implements PaymentRepository {
                 payment.getStatus().name(),
                 nextVersion,
                 payment.getPaymentType().name(),
-                payment.getPayerId().toString(),
+                payment.getPaymentMethod().name(),
+                payment.getCardType() != null ? payment.getCardType().name() : null,
+                toDbUuid(payment.getPayerId()),
                 payment.getInvoiceId(),
-                payment.getSourceAccountId().toString(),
-                payment.getBeneficiaryId().toString(),
+                toDbUuid(payment.getSourceAccountId()),
+                toDbUuid(payment.getBeneficiaryId()),
+                payment.getCardLast4(),
+                payment.getCardHolderName(),
                 payment.getIdempotencyKey(),
                 Timestamp.from(now),
                 payment.getPaymentId().toString(),

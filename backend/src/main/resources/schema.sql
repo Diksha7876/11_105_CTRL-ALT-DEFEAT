@@ -33,10 +33,14 @@ CREATE TABLE IF NOT EXISTS payments (
     status          VARCHAR(50)     NOT NULL COMMENT 'CREATED | VALIDATED | SENT | COMPLETED | FAILED',
     version         BIGINT          NULL,
     payment_type    VARCHAR(50)     NOT NULL COMMENT 'BILL_PAYMENT | BENEFICIARY_TRANSFER',
-    payer_id        CHAR(36)        NOT NULL,
+    payment_method  VARCHAR(50)     NOT NULL COMMENT 'CARD | NET_BANKING',
+    card_type       VARCHAR(50)     NULL COMMENT 'CREDIT_CARD | DEBIT_CARD',
+    payer_id        CHAR(36)        NULL,
     invoice_id      VARCHAR(255)    NULL,
-    source_account_id CHAR(36)      NOT NULL,
-    beneficiary_id  CHAR(36)        NOT NULL,
+    source_account_id CHAR(36)      NULL,
+    beneficiary_id  CHAR(36)        NULL,
+    card_last4      VARCHAR(4)      NULL,
+    card_holder_name VARCHAR(255)   NULL,
     idempotency_key VARCHAR(255)    NOT NULL,
     created_at      DATETIME(6)     NOT NULL,
     updated_at      DATETIME(6)     NOT NULL,
@@ -48,6 +52,78 @@ CREATE TABLE IF NOT EXISTS payments (
     CONSTRAINT fk_payments_beneficiary
         FOREIGN KEY (beneficiary_id)    REFERENCES beneficiaries (beneficiary_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE payments MODIFY source_account_id CHAR(36) NULL;
+ALTER TABLE payments MODIFY beneficiary_id CHAR(36) NULL;
+ALTER TABLE payments MODIFY payer_id CHAR(36) NULL;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'payments'
+              AND column_name = 'payment_method'
+        ),
+        'SELECT 1',
+        "ALTER TABLE payments ADD COLUMN payment_method VARCHAR(50) NOT NULL DEFAULT 'NET_BANKING'"
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'payments'
+              AND column_name = 'card_type'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payments ADD COLUMN card_type VARCHAR(50) NULL'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'payments'
+              AND column_name = 'card_last4'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payments ADD COLUMN card_last4 VARCHAR(4) NULL'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'payments'
+              AND column_name = 'card_holder_name'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payments ADD COLUMN card_holder_name VARCHAR(255) NULL'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS payment_history (
     history_id  CHAR(36)        NOT NULL,

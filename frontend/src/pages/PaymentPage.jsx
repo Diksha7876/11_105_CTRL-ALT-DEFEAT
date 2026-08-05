@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import AsyncState from "../components/AsyncState";
 import PageHeader from "../components/PageHeader";
@@ -20,14 +20,103 @@ const TABS = [
 // =========================================================
 // Create Payment Section
 // =========================================================
+const cardNumberDigitsRegex = /^\d{13,19}$/;
+const cvvRegex = /^\d{3,4}$/;
+
+function onlyDigits(value) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function isLuhnValid(digits) {
+  let sum = 0;
+  let doubleDigit = false;
+  for (let i = digits.length - 1; i >= 0; i -= 1) {
+    let n = Number(digits[i]);
+    if (doubleDigit) {
+      n *= 2;
+      if (n > 9) n -= 9;
+    }
+    sum += n;
+    doubleDigit = !doubleDigit;
+  }
+  return sum % 10 === 0;
+}
+
+function validatePaymentForm(form, payerId, beneficiaries) {
+  const errors = {};
+  const amount = Number(form.amount);
+
+  if (!form.paymentMethod) errors.paymentMethod = "Payment method is required";
+  if (!form.amount) {
+    errors.amount = "Amount is required";
+  } else if (!/^\d+(\.\d{1,2})?$/.test(form.amount)) {
+    errors.amount = "Maximum 2 decimal places allowed";
+  } else if (!(amount > 0)) {
+    errors.amount = "Amount must be greater than 0";
+  } else if (amount > 1000000) {
+    errors.amount = "Amount cannot exceed 1000000";
+  }
+
+  if (!form.currency) errors.currency = "Currency is required";
+
+  if (form.paymentMethod === "NET_BANKING") {
+    if (!payerId) {
+      errors.payerId = "Current user payer ID is required for net banking";
+    }
+    if (!form.beneficiaryId) {
+      errors.beneficiaryId = "Select beneficiary for net banking";
+    } else if (!beneficiaries.some((b) => b.beneficiaryId === form.beneficiaryId)) {
+      errors.beneficiaryId = "Selected beneficiary is invalid";
+    }
+  }
+
+  if (form.paymentMethod === "CARD") {
+    if (!form.cardType) errors.cardType = "Card type is required";
+    if (!form.cardHolderName.trim()) errors.cardHolderName = "Card holder name is required";
+
+    const digits = onlyDigits(form.cardNumber);
+    if (!cardNumberDigitsRegex.test(digits) || !isLuhnValid(digits)) {
+      errors.cardNumber = "Enter a valid card number";
+    }
+
+    const month = Number(form.expiryMonth);
+    const year = Number(form.expiryYear);
+    if (!/^\d{1,2}$/.test(form.expiryMonth) || month < 1 || month > 12) {
+      errors.expiryMonth = "Use a valid month (1-12)";
+    }
+    if (!/^\d{4}$/.test(form.expiryYear)) {
+      errors.expiryYear = "Use a valid 4-digit year";
+    }
+
+    if (!errors.expiryMonth && !errors.expiryYear) {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        errors.expiryYear = "Card is expired";
+      }
+    }
+
+    if (!cvvRegex.test(form.cvv.trim())) {
+      errors.cvv = "CVV must be 3 or 4 digits";
+    }
+  }
+
+  return errors;
+}
+
 const initialPaymentForm = {
-  sourceAccountId: "",
+  paymentMethod: "CARD",
   beneficiaryId: "",
   amount: "",
   currency: "INR",
   reference: "",
-  paymentType: "BILL_PAYMENT",
-  invoiceId: "",
+  cardType: "",
+  cardHolderName: "",
+  cardNumber: "",
+  expiryMonth: "",
+  expiryYear: "",
+  cvv: "",
 };
 
 function CreatePaymentSection() {
@@ -35,7 +124,6 @@ function CreatePaymentSection() {
   const payerId = currentUser?.payerId ?? null;
   const [form, setForm] = useState(initialPaymentForm);
   const [formErrors, setFormErrors] = useState({});
-  const [accounts, setAccounts] = useState([]);
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -47,11 +135,7 @@ function CreatePaymentSection() {
     setLoading(true);
     setError("");
     try {
-      const [accountsRes, beneficiariesRes] = await Promise.all([
-        api.get("/api/accounts"),
-        api.get("/api/beneficiaries"),
-      ]);
-      setAccounts(accountsRes.data ?? []);
+      const beneficiariesRes = await api.get("/api/beneficiaries");
       setBeneficiaries(beneficiariesRes.data ?? []);
     } catch (err) {
       const text = getErrorText(err);
@@ -66,49 +150,16 @@ function CreatePaymentSection() {
     loadDependencies();
   }, [loadDependencies]);
 
-  const ownedAccounts = useMemo(() => {
-    return accounts.filter((account) => {
-      if (!payerId) {
-        return true;
-      }
-      const ownerPayerId =
-        account.payerId ?? account.ownerPayerId ?? account.userPayerId ?? null;
-      if (!ownerPayerId) {
-        return true;
-      }
-      return String(ownerPayerId) === String(payerId);
-    });
-  }, [accounts, payerId]);
-
   const validate = () => {
-    const errors = {};
-    const amount = Number(form.amount);
-    if (!form.sourceAccountId) errors.sourceAccountId = "Select source account";
-    if (
-      form.sourceAccountId &&
-      !ownedAccounts.some((account) => account.accountId === form.sourceAccountId)
-    ) {
-      errors.sourceAccountId = "Select a source account owned by the current user";
-    }
-    if (!form.beneficiaryId) errors.beneficiaryId = "Select beneficiary";
-    if (!form.amount) {
-      errors.amount = "Amount is required";
-    } else if (!/^\d+(\.\d{1,2})?$/.test(form.amount)) {
-      errors.amount = "Maximum 2 decimal places allowed";
-    } else if (!(amount > 0)) {
-      errors.amount = "Amount must be greater than 0";
-    } else if (amount > 1000000) {
-      errors.amount = "Amount cannot exceed 1000000";
-    }
-    if (!form.reference.trim()) errors.reference = "Reference is required";
-    if (!form.currency) errors.currency = "Currency is required";
-    if (!form.paymentType) errors.paymentType = "Payment type is required";
-    if (!payerId) errors.payerId = "Current user payer ID is missing";
-    if (form.paymentType === "BILL_PAYMENT" && !form.invoiceId.trim())
-      errors.invoiceId = "Invoice ID is required for bill payment";
+    const errors = validatePaymentForm(form, payerId, beneficiaries);
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
+
+  const canSubmit =
+    !loading &&
+    !submitting &&
+    Object.keys(validatePaymentForm(form, payerId, beneficiaries)).length === 0;
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -119,12 +170,20 @@ function CreatePaymentSection() {
     const body = {
       amount: Number(form.amount),
       currency: form.currency,
-      reference: form.reference.trim(),
-      payerId,
-      beneficiaryId: form.beneficiaryId,
-      sourceAccountId: form.sourceAccountId,
-      paymentType: form.paymentType,
-      ...(form.paymentType === "BILL_PAYMENT" ? { invoiceId: form.invoiceId.trim() } : {}),
+      paymentMethod: form.paymentMethod,
+      paymentType: "BENEFICIARY_TRANSFER",
+      ...(payerId ? { payerId } : {}),
+      ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
+      ...(form.paymentMethod === "NET_BANKING"
+        ? { beneficiaryId: form.beneficiaryId }
+        : {
+            cardType: form.cardType,
+            cardHolderName: form.cardHolderName.trim(),
+            cardNumber: onlyDigits(form.cardNumber),
+            expiryMonth: String(Number(form.expiryMonth)),
+            expiryYear: form.expiryYear.trim(),
+            cvv: form.cvv.trim(),
+          }),
     };
     try {
       const response = await api.post("/api/payments", body, {
@@ -134,6 +193,7 @@ function CreatePaymentSection() {
       toast.success("Payment created successfully");
       setIdempotencyKey("");
       setForm(initialPaymentForm);
+      setFormErrors({});
     } catch (err) {
       toast.error(getErrorText(err));
     } finally {
@@ -146,9 +206,7 @@ function CreatePaymentSection() {
       loading={loading}
       error={error}
       onRetry={loadDependencies}
-      isEmpty={!loading && !error && (ownedAccounts.length === 0 || beneficiaries.length === 0)}
-      emptyTitle="Missing dependencies"
-      emptyDescription="Ensure at least one owned source account and one beneficiary exists before payment creation."
+      isEmpty={false}
     >
       <div className="grid gap-6 lg:grid-cols-5">
         <form
@@ -157,45 +215,143 @@ function CreatePaymentSection() {
           noValidate
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="field md:col-span-2">
-              <span>Source Account</span>
-              <select
-                className="input"
-                value={form.sourceAccountId}
-                onChange={(e) => setForm((p) => ({ ...p, sourceAccountId: e.target.value }))}
-                required
-              >
-                <option value="">Select account</option>
-                {ownedAccounts.map((a) => (
-                  <option key={a.accountId} value={a.accountId}>
-                    {a.accountId} - {a.accountNumber}
-                  </option>
+            <fieldset className="field md:col-span-2">
+              <legend>Payment Method</legend>
+              <div className="mt-2 flex flex-wrap gap-4">
+                {[
+                  ["CARD", "Card Payment"],
+                  ["NET_BANKING", "Net Banking"],
+                ].map(([value, label]) => (
+                  <label key={value} className="inline-flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value={value}
+                      checked={form.paymentMethod === value}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          paymentMethod: e.target.value,
+                          beneficiaryId: "",
+                          cardType: "",
+                          cardHolderName: "",
+                          cardNumber: "",
+                          expiryMonth: "",
+                          expiryYear: "",
+                          cvv: "",
+                        }))
+                      }
+                    />
+                    {label}
+                  </label>
                 ))}
-              </select>
-              {formErrors.sourceAccountId && (
-                <p className="error-text">{formErrors.sourceAccountId}</p>
-              )}
-            </label>
+              </div>
+              {formErrors.paymentMethod && <p className="error-text">{formErrors.paymentMethod}</p>}
+            </fieldset>
 
-            <label className="field md:col-span-2">
-              <span>Beneficiary</span>
-              <select
-                className="input"
-                value={form.beneficiaryId}
-                onChange={(e) => setForm((p) => ({ ...p, beneficiaryId: e.target.value }))}
-                required
-              >
-                <option value="">Select beneficiary</option>
-                {beneficiaries.map((b) => (
-                  <option key={b.beneficiaryId} value={b.beneficiaryId}>
-                    {b.beneficiaryId} - {b.name}
-                  </option>
-                ))}
-              </select>
-              {formErrors.beneficiaryId && (
-                <p className="error-text">{formErrors.beneficiaryId}</p>
-              )}
-            </label>
+            {form.paymentMethod === "NET_BANKING" && (
+              <label className="field md:col-span-2">
+                <span>Beneficiary ID</span>
+                <select
+                  className="input"
+                  value={form.beneficiaryId}
+                  onChange={(e) => setForm((p) => ({ ...p, beneficiaryId: e.target.value }))}
+                  required
+                >
+                  <option value="">Select beneficiary</option>
+                  {beneficiaries.map((b) => (
+                    <option key={b.beneficiaryId} value={b.beneficiaryId}>
+                      {b.beneficiaryId} - {b.name}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.beneficiaryId && (
+                  <p className="error-text">{formErrors.beneficiaryId}</p>
+                )}
+              </label>
+            )}
+
+            {form.paymentMethod === "CARD" && (
+              <>
+                <label className="field">
+                  <span>Card Type</span>
+                  <select
+                    className="input"
+                    value={form.cardType}
+                    onChange={(e) => setForm((p) => ({ ...p, cardType: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select card type</option>
+                    <option value="CREDIT_CARD">Credit Card</option>
+                    <option value="DEBIT_CARD">Debit Card</option>
+                  </select>
+                  {formErrors.cardType && <p className="error-text">{formErrors.cardType}</p>}
+                </label>
+
+                <label className="field">
+                  <span>Cardholder Name</span>
+                  <input
+                    className="input"
+                    value={form.cardHolderName}
+                    onChange={(e) => setForm((p) => ({ ...p, cardHolderName: e.target.value }))}
+                    required
+                  />
+                  {formErrors.cardHolderName && <p className="error-text">{formErrors.cardHolderName}</p>}
+                </label>
+
+                <label className="field md:col-span-2">
+                  <span>Card Number</span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    value={form.cardNumber}
+                    onChange={(e) => setForm((p) => ({ ...p, cardNumber: e.target.value }))}
+                    placeholder="4111 1111 1111 1111"
+                    required
+                  />
+                  {formErrors.cardNumber && <p className="error-text">{formErrors.cardNumber}</p>}
+                </label>
+
+                <label className="field">
+                  <span>Expiry Month</span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    value={form.expiryMonth}
+                    onChange={(e) => setForm((p) => ({ ...p, expiryMonth: e.target.value }))}
+                    placeholder="MM"
+                    required
+                  />
+                  {formErrors.expiryMonth && <p className="error-text">{formErrors.expiryMonth}</p>}
+                </label>
+
+                <label className="field">
+                  <span>Expiry Year</span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    value={form.expiryYear}
+                    onChange={(e) => setForm((p) => ({ ...p, expiryYear: e.target.value }))}
+                    placeholder="YYYY"
+                    required
+                  />
+                  {formErrors.expiryYear && <p className="error-text">{formErrors.expiryYear}</p>}
+                </label>
+
+                <label className="field md:col-span-2">
+                  <span>CVV</span>
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    value={form.cvv}
+                    onChange={(e) => setForm((p) => ({ ...p, cvv: e.target.value }))}
+                    placeholder="3 or 4 digits"
+                    required
+                  />
+                  {formErrors.cvv && <p className="error-text">{formErrors.cvv}</p>}
+                </label>
+              </>
+            )}
 
             <label className="field">
               <span>Amount</span>
@@ -230,53 +386,20 @@ function CreatePaymentSection() {
                 className="input"
                 value={form.reference}
                 onChange={(e) => setForm((p) => ({ ...p, reference: e.target.value }))}
-                required
               />
               {formErrors.reference && <p className="error-text">{formErrors.reference}</p>}
             </label>
 
-            <fieldset className="field md:col-span-2">
-              <legend>Payment Type</legend>
-              <div className="mt-2 flex flex-wrap gap-4">
-                {[
-                  ["BILL_PAYMENT", "Bill Payment"],
-                  ["BENEFICIARY_TRANSFER", "Beneficiary Transfer"],
-                ].map(([value, label]) => (
-                  <label key={value} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="paymentType"
-                      value={value}
-                      checked={form.paymentType === value}
-                      onChange={(e) => setForm((p) => ({ ...p, paymentType: e.target.value }))}
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            {form.paymentType === "BILL_PAYMENT" && (
+            {form.paymentMethod === "NET_BANKING" && (
               <label className="field md:col-span-2">
-                <span>Invoice ID</span>
-                <input
-                  className="input"
-                  value={form.invoiceId}
-                  onChange={(e) => setForm((p) => ({ ...p, invoiceId: e.target.value }))}
-                  required
-                />
-                {formErrors.invoiceId && <p className="error-text">{formErrors.invoiceId}</p>}
+                <span>Payer ID</span>
+                <input className="input" value={payerId ?? ""} readOnly />
+                {formErrors.payerId && <p className="error-text">{formErrors.payerId}</p>}
               </label>
             )}
 
-            <label className="field md:col-span-2">
-              <span>Payer ID</span>
-              <input className="input" value={payerId} readOnly />
-              {formErrors.payerId && <p className="error-text">{formErrors.payerId}</p>}
-            </label>
-
             <div className="md:col-span-2 flex flex-wrap items-center gap-2">
-              <button className="btn-primary" type="submit" disabled={submitting}>
+              <button className="btn-primary" type="submit" disabled={!canSubmit}>
                 {submitting ? "Submitting..." : "Submit Payment"}
               </button>
               {idempotencyKey && (
@@ -287,7 +410,6 @@ function CreatePaymentSection() {
             </div>
           </div>
         </form>
-
         <aside className="rounded-2xl border border-zinc-300/70 bg-white/80 p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/70 lg:col-span-2">
           <h3 className="text-lg font-semibold">Last Created Payment</h3>
           {!createdPayment ? (
@@ -296,16 +418,23 @@ function CreatePaymentSection() {
             </p>
           ) : (
             <dl className="mt-4 grid gap-2 text-sm">
+              <div className="grid grid-cols-[150px_1fr] gap-2">
+                <dt className="font-semibold text-zinc-500 dark:text-zinc-400">method</dt>
+                <dd className="break-all">
+                  {createdPayment?.paymentMethod === "CARD" ? "Card Payment" : "Net Banking"}
+                </dd>
+              </div>
               {[
                 "paymentId",
                 "status",
                 "createdAt",
                 "updatedAt",
-                "paymentType",
-                "sourceAccountId",
+                "paymentMethod",
+                "cardType",
+                "cardLast4",
+                "cardHolderName",
                 "beneficiaryId",
                 "payerId",
-                "invoiceId",
               ].map((key) => (
                 <div key={key} className="grid grid-cols-[150px_1fr] gap-2">
                   <dt className="font-semibold text-zinc-500 dark:text-zinc-400">{key}</dt>

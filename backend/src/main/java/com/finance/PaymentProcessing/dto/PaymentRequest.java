@@ -1,5 +1,7 @@
 package com.finance.PaymentProcessing.dto;
 
+import com.finance.PaymentProcessing.model.CardType;
+import com.finance.PaymentProcessing.model.PaymentMethod;
 import com.finance.PaymentProcessing.model.PaymentType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.DecimalMax;
@@ -12,10 +14,16 @@ import java.util.UUID;
 public record PaymentRequest(
                 @NotNull @DecimalMin(value = "0.01") @DecimalMax(value = "1000000.00") @Digits(integer = 7, fraction = 2) BigDecimal amount,
                 @NotBlank String currency,
-                @NotBlank String reference,
-                @NotNull UUID beneficiaryId,
-                @NotNull UUID sourceAccountId,
-                @NotNull UUID payerId,
-                @NotNull PaymentType paymentType,
+                String reference,
+                UUID payerId,
+                @NotNull PaymentMethod paymentMethod,
+                UUID beneficiaryId,
+                CardType cardType,
+                String cardHolderName,
+                String cardNumber,
+                String expiryMonth,
+                String expiryYear,
+                String cvv,
+                PaymentType paymentType,
                 String invoiceId) {
 }

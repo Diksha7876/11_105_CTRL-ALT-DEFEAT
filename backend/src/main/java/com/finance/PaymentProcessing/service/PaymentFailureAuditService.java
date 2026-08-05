@@ -4,12 +4,10 @@ import com.finance.PaymentProcessing.dto.PaymentRequest;
 import com.finance.PaymentProcessing.exception.BadRequestException;
 import com.finance.PaymentProcessing.exception.ConflictException;
 import com.finance.PaymentProcessing.exception.NotFoundException;
-import com.finance.PaymentProcessing.model.BankAccount;
 import com.finance.PaymentProcessing.model.Beneficiary;
 import com.finance.PaymentProcessing.model.Payment;
 import com.finance.PaymentProcessing.model.PaymentStatus;
 import com.finance.PaymentProcessing.model.PaymentType;
-import com.finance.PaymentProcessing.repository.BankAccountRepository;
 import com.finance.PaymentProcessing.repository.BeneficiaryRepository;
 import com.finance.PaymentProcessing.repository.PaymentRepository;
 import java.math.BigDecimal;
@@ -23,25 +21,21 @@ public class PaymentFailureAuditService {
 
     private final PaymentRepository paymentRepository;
     private final BeneficiaryRepository beneficiaryRepository;
-    private final BankAccountRepository bankAccountRepository;
     private final HistoryService historyService;
 
     public PaymentFailureAuditService(
             PaymentRepository paymentRepository,
             BeneficiaryRepository beneficiaryRepository,
-            BankAccountRepository bankAccountRepository,
             HistoryService historyService) {
         this.paymentRepository = paymentRepository;
         this.beneficiaryRepository = beneficiaryRepository;
-        this.bankAccountRepository = bankAccountRepository;
         this.historyService = historyService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void persistFailedAttempt(PaymentRequest request, String idempotencyKey, RuntimeException ex) {
-        UUID sourceAccountId = resolveSourceAccountId(request.sourceAccountId());
         UUID beneficiaryId = resolveBeneficiaryId(request.beneficiaryId());
-        if (sourceAccountId == null || beneficiaryId == null) {
+        if (beneficiaryId == null) {
             return;
         }
 
@@ -50,7 +44,7 @@ public class PaymentFailureAuditService {
             failed.setAmount(sanitizeAmount(request.amount()));
             failed.setCurrency(sanitizeCurrency(request.currency()));
             failed.setReference(sanitizeReference(request.reference()));
-            failed.setSourceAccountId(sourceAccountId);
+            failed.setSourceAccountId(null);
             failed.setBeneficiaryId(beneficiaryId);
             failed.setPayerId(request.payerId());
             failed.setPaymentType(request.paymentType() != null ? request.paymentType() : PaymentType.BILL_PAYMENT);
@@ -64,16 +58,6 @@ public class PaymentFailureAuditService {
         } catch (RuntimeException ignored) {
             // Keep original exception behavior if audit persistence cannot be recorded.
         }
-    }
-
-    private UUID resolveSourceAccountId(UUID requestedId) {
-        if (requestedId != null && bankAccountRepository.existsById(requestedId)) {
-            return requestedId;
-        }
-        return bankAccountRepository.findAll().stream()
-                .map(BankAccount::getAccountId)
-                .findFirst()
-                .orElse(null);
     }
 
     private UUID resolveBeneficiaryId(UUID requestedId) {
