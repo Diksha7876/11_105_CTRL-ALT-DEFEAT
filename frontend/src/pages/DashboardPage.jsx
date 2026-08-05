@@ -7,12 +7,13 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
 import PageHeader from "../components/PageHeader";
 import SkeletonTable from "../components/SkeletonTable";
-import { getErrorText, getIncomingPayments } from "../lib/api";
+import { api, getErrorText, getIncomingPayments } from "../lib/api";
 import { formatCurrency } from "../lib/formatters";
 
 function toDateKey(value) {
@@ -36,42 +37,53 @@ function getWeekStartKey(dateKey) {
   return date.toISOString().slice(0, 10);
 }
 
-function aggregateIncomingByPeriod(payments, period) {
+function aggregateByPeriod(incomingPayments, outgoingPayments, period) {
   const map = {};
-  payments.forEach((payment) => {
-    const dateKey = toDateKey(payment.receivedAt);
-    if (!dateKey) {
-      return;
-    }
-    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+
+  const ensureBucket = (bucketKey, label) => {
     if (!map[bucketKey]) {
-      map[bucketKey] = {
-        bucketKey,
-        dateLabel:
-          period === "weekly"
-            ? `Week of ${formatDateLabel(bucketKey)}`
-            : formatDateLabel(bucketKey),
-        totalAmount: 0,
-      };
+      map[bucketKey] = { bucketKey, dateLabel: label, incoming: 0, outgoing: 0 };
     }
-    map[bucketKey].totalAmount += Number(payment.amount) || 0;
+  };
+
+  incomingPayments.forEach((payment) => {
+    const dateKey = toDateKey(payment.receivedAt);
+    if (!dateKey) return;
+    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+    const label = period === "weekly" ? `Week of ${formatDateLabel(bucketKey)}` : formatDateLabel(bucketKey);
+    ensureBucket(bucketKey, label);
+    map[bucketKey].incoming += Number(payment.amount) || 0;
+  });
+
+  outgoingPayments.forEach((payment) => {
+    const dateKey = toDateKey(payment.createdAt || payment.createdOn);
+    if (!dateKey) return;
+    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+    const label = period === "weekly" ? `Week of ${formatDateLabel(bucketKey)}` : formatDateLabel(bucketKey);
+    ensureBucket(bucketKey, label);
+    map[bucketKey].outgoing += Number(payment.amount) || 0;
   });
 
   return Object.values(map)
     .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey))
-    .map((bucket) => ({ dateLabel: bucket.dateLabel, totalAmount: bucket.totalAmount }));
+    .map(({ dateLabel, incoming, outgoing }) => ({ dateLabel, incoming, outgoing }));
 }
 
 export default function DashboardPage() {
   const [incomingPayments, setIncomingPayments] = useState([]);
+  const [outgoingPayments, setOutgoingPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("daily");
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const rows = await getIncomingPayments();
-      setIncomingPayments(Array.isArray(rows) ? rows : []);
+      const [incomingRows, outgoingRes] = await Promise.all([
+        getIncomingPayments(),
+        api.get("/api/payments", { params: { status: "COMPLETED", page: 0, size: 500 } }).catch(() => ({ data: { content: [] } })),
+      ]);
+      setIncomingPayments(Array.isArray(incomingRows) ? incomingRows : []);
+      setOutgoingPayments(outgoingRes.data?.content ?? []);
     } catch (err) {
       toast.error(getErrorText(err));
     } finally {
@@ -84,13 +96,18 @@ export default function DashboardPage() {
   }, [loadData]);
 
   const chartData = useMemo(
-    () => aggregateIncomingByPeriod(incomingPayments, period),
-    [incomingPayments, period]
+    () => aggregateByPeriod(incomingPayments, outgoingPayments, period),
+    [incomingPayments, outgoingPayments, period]
   );
 
   const totalIncoming = useMemo(
     () => incomingPayments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [incomingPayments]
+  );
+
+  const totalOutgoing = useMemo(
+    () => outgoingPayments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+    [outgoingPayments]
   );
 
   return (
@@ -142,11 +159,18 @@ export default function DashboardPage() {
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Incoming Totals Over Time
+              Payment Activity Over Time
             </h2>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Total incoming: {formatCurrency(totalIncoming, "INR")}
-            </p>
+            <div className="mt-1 flex flex-wrap gap-4 text-sm text-zinc-600 dark:text-zinc-400">
+              <span>
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#86efac] mr-1" />
+                Incoming: {formatCurrency(totalIncoming, "INR")}
+              </span>
+              <span>
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#fca5a5] mr-1" />
+                Outgoing (Completed): {formatCurrency(totalOutgoing, "INR")}
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -169,7 +193,7 @@ export default function DashboardPage() {
           <SkeletonTable rows={5} columns={6} />
         ) : chartData.length === 0 ? (
           <div className="flex items-center justify-center py-16 text-sm text-zinc-500 dark:text-zinc-400">
-            No incoming data to display.
+            No payment data to display.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
@@ -187,7 +211,10 @@ export default function DashboardPage() {
                 tickLine={false}
               />
               <Tooltip
-                formatter={(value) => [formatCurrency(value, "INR"), "Incoming Total"]}
+                formatter={(value, name) => [
+                  formatCurrency(value, "INR"),
+                  name === "incoming" ? "Incoming" : "Outgoing (Completed)",
+                ]}
                 contentStyle={{
                   backgroundColor: "#18181b",
                   border: "1px solid #3f3f46",
@@ -197,7 +224,12 @@ export default function DashboardPage() {
                 }}
                 cursor={{ fill: "rgba(255,255,255,0.04)" }}
               />
-              <Bar dataKey="totalAmount" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+              <Legend
+                formatter={(value) => value === "incoming" ? "Incoming" : "Outgoing (Completed)"}
+                wrapperStyle={{ fontSize: 12 }}
+              />
+              <Bar dataKey="incoming" fill="#86efac" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="outgoing" fill="#fca5a5" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

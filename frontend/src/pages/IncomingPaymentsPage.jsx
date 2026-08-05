@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -12,7 +13,7 @@ import {
 import AsyncState from "../components/AsyncState";
 import PageHeader from "../components/PageHeader";
 import SkeletonTable from "../components/SkeletonTable";
-import { createIncomingPayment, getErrorText, getIncomingPayments } from "../lib/api";
+import { api, createIncomingPayment, getErrorText, getIncomingPayments } from "../lib/api";
 import { CURRENCIES } from "../lib/constants";
 import { formatCurrency, formatDateTime } from "../lib/formatters";
 
@@ -66,41 +67,44 @@ function getWeekStartKey(dateKey) {
   return date.toISOString().slice(0, 10);
 }
 
-function aggregateIncomingByPeriod(rows, period) {
+function aggregateByPeriod(incomingRows, outgoingRows, period) {
   const map = {};
 
-  rows.forEach((payment) => {
-    const dateKey = toDateKey(payment.receivedAt);
-    if (!dateKey) {
-      return;
-    }
-
-    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+  const ensureBucket = (bucketKey, label) => {
     if (!map[bucketKey]) {
-      map[bucketKey] = {
-        bucketKey,
-        label:
-          period === "weekly"
-            ? `Week of ${formatDateLabel(bucketKey)}`
-            : formatDateLabel(bucketKey),
-        total: 0,
-      };
+      map[bucketKey] = { bucketKey, label, incoming: 0, outgoing: 0 };
     }
+  };
 
-    map[bucketKey].total += Number(payment.amount) || 0;
+  incomingRows.forEach((payment) => {
+    const dateKey = toDateKey(payment.receivedAt);
+    if (!dateKey) return;
+    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+    const label = period === "weekly" ? `Week of ${formatDateLabel(bucketKey)}` : formatDateLabel(bucketKey);
+    ensureBucket(bucketKey, label);
+    map[bucketKey].incoming += Number(payment.amount) || 0;
+  });
+
+  outgoingRows.forEach((payment) => {
+    const dateKey = toDateKey(payment.createdAt || payment.createdOn);
+    if (!dateKey) return;
+    const bucketKey = period === "weekly" ? getWeekStartKey(dateKey) : dateKey;
+    const label = period === "weekly" ? `Week of ${formatDateLabel(bucketKey)}` : formatDateLabel(bucketKey);
+    ensureBucket(bucketKey, label);
+    map[bucketKey].outgoing += Number(payment.amount) || 0;
   });
 
   return Object.values(map)
     .sort((a, b) => a.bucketKey.localeCompare(b.bucketKey))
-    .map((bucket) => ({ label: bucket.label, total: bucket.total }));
+    .map(({ label, incoming, outgoing }) => ({ label, incoming, outgoing }));
 }
 
-function IncomingHistorySection({ incomingPayments, loading, error, onRetry }) {
+function IncomingHistorySection({ incomingPayments, outgoingPayments, loading, error, onRetry }) {
   const [period, setPeriod] = useState("daily");
 
   const chartData = useMemo(
-    () => aggregateIncomingByPeriod(incomingPayments, period),
-    [incomingPayments, period]
+    () => aggregateByPeriod(incomingPayments, outgoingPayments, period),
+    [incomingPayments, outgoingPayments, period]
   );
 
   const sortedRows = useMemo(() => {
@@ -122,7 +126,13 @@ function IncomingHistorySection({ incomingPayments, loading, error, onRetry }) {
       <div className="grid gap-6">
         <section className="rounded-2xl border border-zinc-300/70 bg-white/80 p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/70">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Incoming Amount Trend</h2>
+            <div>
+              <h2 className="text-lg font-semibold">Payment Amount Trend</h2>
+              <div className="mt-1 flex flex-wrap gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+                <span><span className="inline-block h-2 w-2 rounded-full bg-[#86efac] mr-1" />Incoming</span>
+                <span><span className="inline-block h-2 w-2 rounded-full bg-[#fca5a5] mr-1" />Outgoing (Completed)</span>
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -161,9 +171,9 @@ function IncomingHistorySection({ incomingPayments, loading, error, onRetry }) {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(value) => [
+                  formatter={(value, name) => [
                     formatCurrency(value, "INR"),
-                    "Total Incoming",
+                    name === "incoming" ? "Incoming" : "Outgoing (Completed)",
                   ]}
                   contentStyle={{
                     backgroundColor: "#18181b",
@@ -173,7 +183,12 @@ function IncomingHistorySection({ incomingPayments, loading, error, onRetry }) {
                     fontSize: 12,
                   }}
                 />
-                <Bar dataKey="total" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                <Legend
+                  formatter={(value) => value === "incoming" ? "Incoming" : "Outgoing (Completed)"}
+                  wrapperStyle={{ fontSize: 12 }}
+                />
+                <Bar dataKey="incoming" fill="#86efac" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="outgoing" fill="#fca5a5" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -429,6 +444,7 @@ function IncomingCreateSection({ onCreated }) {
 export default function IncomingPaymentsPage() {
   const [activeTab, setActiveTab] = useState("history");
   const [incomingPayments, setIncomingPayments] = useState([]);
+  const [outgoingPayments, setOutgoingPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -436,9 +452,13 @@ export default function IncomingPaymentsPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await getIncomingPayments();
+      const [data, outgoingRes] = await Promise.all([
+        getIncomingPayments(),
+        api.get("/api/payments", { params: { status: "COMPLETED", page: 0, size: 500 } }).catch(() => ({ data: { content: [] } })),
+      ]);
       const mapped = Array.isArray(data) ? data.map(mapIncomingPayment) : [];
       setIncomingPayments(mapped);
+      setOutgoingPayments(outgoingRes.data?.content ?? []);
     } catch (err) {
       const text = getErrorText(err);
       setError(text);
@@ -475,6 +495,7 @@ export default function IncomingPaymentsPage() {
       {activeTab === "history" && (
         <IncomingHistorySection
           incomingPayments={incomingPayments}
+          outgoingPayments={outgoingPayments}
           loading={loading}
           error={error}
           onRetry={loadIncomingPayments}
