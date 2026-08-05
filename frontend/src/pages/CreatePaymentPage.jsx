@@ -106,6 +106,10 @@ export default function CreatePaymentPage() {
       errors.paymentType = "Payment type is required";
     }
 
+    if (!payerId) {
+      errors.payerId = "Current user payer ID is missing";
+    }
+
     if (form.paymentType === "BILL_PAYMENT" && !form.invoiceId.trim()) {
       errors.invoiceId = "Invoice ID is required for bill payment";
     }
@@ -130,6 +134,7 @@ export default function CreatePaymentPage() {
       amount: Number(form.amount),
       currency: form.currency,
       reference: form.reference.trim(),
+      payerId,
       beneficiaryId: form.beneficiaryId,
       sourceAccountId: form.sourceAccountId,
       paymentType: form.paymentType,
@@ -304,6 +309,7 @@ export default function CreatePaymentPage() {
               <label className="field md:col-span-2">
                 <span>Payer ID (hidden source)</span>
                 <input className="input" value={payerId} readOnly />
+                {formErrors.payerId && <p className="error-text">{formErrors.payerId}</p>}
               </label>
 
               <div className="md:col-span-2 flex flex-wrap items-center gap-2">
