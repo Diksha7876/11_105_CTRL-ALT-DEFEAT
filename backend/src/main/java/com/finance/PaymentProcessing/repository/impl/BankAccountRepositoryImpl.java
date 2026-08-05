@@ -4,6 +4,7 @@ import com.finance.PaymentProcessing.model.BankAccount;
 import com.finance.PaymentProcessing.repository.BankAccountRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +29,11 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
         a.setAccountId(UUID.fromString(rs.getString("account_id")));
         a.setAccountNumber(rs.getString("account_number"));
         a.setAccountHolderName(rs.getString("account_holder_name"));
+        String payerId = rs.getString("payer_id");
+        a.setPayerId(payerId != null ? UUID.fromString(payerId) : null);
+        a.setAccountType(rs.getString("account_type"));
+        BigDecimal balanceInInr = rs.getBigDecimal("balance_in_inr");
+        a.setBalanceInInr(balanceInInr != null ? balanceInInr : BigDecimal.ZERO);
         a.setActive(rs.getBoolean("active"));
         return a;
     }
@@ -38,18 +44,24 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
             // INSERT: generate UUID here so MySQL receives it as a CHAR(36)
             account.setAccountId(UUID.randomUUID());
             jdbc.update(
-                "INSERT INTO bank_accounts (account_id, account_number, account_holder_name, active) VALUES (?, ?, ?, ?)",
+                "INSERT INTO bank_accounts (account_id, account_number, account_holder_name, payer_id, account_type, balance_in_inr, active) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 account.getAccountId().toString(),
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
+                account.getPayerId() != null ? account.getPayerId().toString() : null,
+                account.getAccountType(),
+                account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
                 account.isActive()
             );
         } else {
             // UPDATE
             jdbc.update(
-                "UPDATE bank_accounts SET account_number = ?, account_holder_name = ?, active = ? WHERE account_id = ?",
+                "UPDATE bank_accounts SET account_number = ?, account_holder_name = ?, payer_id = ?, account_type = ?, balance_in_inr = ?, active = ? WHERE account_id = ?",
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
+                account.getPayerId() != null ? account.getPayerId().toString() : null,
+                account.getAccountType(),
+                account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
                 account.isActive(),
                 account.getAccountId().toString()
             );

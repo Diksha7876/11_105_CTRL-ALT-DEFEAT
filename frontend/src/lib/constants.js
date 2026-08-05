@@ -8,6 +8,14 @@ export const PAYMENT_STATUSES = [
 
 export const CURRENCIES = ["INR", "USD", "EUR", "GBP"];
 
+// INR value for one unit of target currency.
+export const INR_PER_CURRENCY = {
+  INR: 1,
+  USD: 83.1,
+  EUR: 90.25,
+  GBP: 105.4,
+};
+
 export const PAYMENT_TYPES = ["BILL_PAYMENT", "BENEFICIARY_TRANSFER"];
 
 export const STATUS_BADGE_CLASS = {

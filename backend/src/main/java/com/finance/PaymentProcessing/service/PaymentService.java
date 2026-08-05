@@ -6,6 +6,8 @@ import com.finance.PaymentProcessing.exception.ConflictException;
 import com.finance.PaymentProcessing.exception.NotFoundException;
 import com.finance.PaymentProcessing.model.*;
 import com.finance.PaymentProcessing.repository.*;
+import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,21 +18,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class PaymentService {
     private final PaymentRepository paymentRepository;
+    private final BankAccountRepository bankAccountRepository;
     private final ValidationService validationService;
     private final HistoryService historyService;
     private final PaymentLifecycleService paymentLifecycleService;
     private final PaymentFailureAuditService paymentFailureAuditService;
+    private final CurrencyConversionService currencyConversionService;
 
     public PaymentService(PaymentRepository paymentRepository,
+            BankAccountRepository bankAccountRepository,
             ValidationService validationService,
             HistoryService historyService,
             PaymentLifecycleService paymentLifecycleService,
-            PaymentFailureAuditService paymentFailureAuditService) {
+            PaymentFailureAuditService paymentFailureAuditService,
+            CurrencyConversionService currencyConversionService) {
         this.paymentRepository = paymentRepository;
+        this.bankAccountRepository = bankAccountRepository;
         this.validationService = validationService;
         this.historyService = historyService;
         this.paymentLifecycleService = paymentLifecycleService;
         this.paymentFailureAuditService = paymentFailureAuditService;
+        this.currencyConversionService = currencyConversionService;
     }
 
     public PaymentCreationResult createPayment(PaymentRequest request, String idempotencyKey) {
@@ -40,8 +48,8 @@ public class PaymentService {
                     try {
                     validationService.validateAmount(request.amount());
                     validationService.validateCurrency(request.currency());
-                    if (request.paymentMethod() == PaymentMethod.NET_BANKING && request.payerId() == null) {
-                        throw new BadRequestException("VALIDATION_FAILED", "payerId is required for net banking");
+                    if (request.payerId() == null) {
+                        throw new BadRequestException("VALIDATION_FAILED", "payerId is required");
                     }
 
                     validationService.validateMethodSpecificDetails(
@@ -56,7 +64,11 @@ public class PaymentService {
                             request.upiId());
 
                     if (request.paymentMethod() == PaymentMethod.NET_BANKING) {
+                        if (request.sourceAccountId() == null) {
+                            throw new BadRequestException("VALIDATION_FAILED", "sourceAccountId is required for net banking");
+                        }
                         validationService.validateBeneficiary(request.beneficiaryId());
+                        validationService.validateSourceAccount(request.sourceAccountId(), request.beneficiaryId());
                     }
 
                     PaymentType paymentType = request.paymentType() != null
@@ -73,11 +85,31 @@ public class PaymentService {
                         throw new ConflictException("DUPLICATE_PAYMENT",
                             "This invoice has already been paid by this payer");
                     }
+                    BankAccount sourceAccount = resolveDebitSourceAccount(request);
+
+                    BigDecimal currentBalance = sourceAccount.getBalanceInInr() != null
+                        ? sourceAccount.getBalanceInInr()
+                        : BigDecimal.ZERO;
+                    BigDecimal debitAmountInInr = currencyConversionService.convertToInr(
+                        request.amount(), request.currency());
+
+                    if (currentBalance.compareTo(debitAmountInInr) < 0) {
+                        throw new BadRequestException("INSUFFICIENT_FUNDS",
+                            "Insufficient balance. Required INR " + debitAmountInInr + ", available INR "
+                                + currentBalance);
+                    }
+
+                    sourceAccount.setBalanceInInr(currentBalance.subtract(debitAmountInInr));
+                    bankAccountRepository.save(sourceAccount);
+
                     Payment payment = new Payment();
+                    String sentRemarks = "Payment sent for processing. Debited INR " + debitAmountInInr
+                        + " from source account.";
+
                     payment.setAmount(request.amount());
                     payment.setCurrency(request.currency().toUpperCase());
                     payment.setReference(resolveReference(request));
-                    payment.setSourceAccountId(null);
+                    payment.setSourceAccountId(sourceAccount.getAccountId());
                     payment.setBeneficiaryId(request.beneficiaryId());
                     payment.setPayerId(request.payerId());
                     payment.setPaymentType(paymentType);
@@ -101,7 +133,7 @@ public class PaymentService {
                     payment.setIdempotencyKey(idempotencyKey);
                     payment.setStatus(PaymentStatus.SENT);
                     Payment saved = paymentRepository.save(payment);
-                    historyService.recordTransition(saved, null, PaymentStatus.SENT, "Payment sent for processing", null,
+                    historyService.recordTransition(saved, null, PaymentStatus.SENT, sentRemarks, null,
                         "SYSTEM");
                     paymentLifecycleService.scheduleCompletion(saved.getPaymentId());
                     return new PaymentCreationResult(toResponse(saved), true);
@@ -156,5 +188,36 @@ public class PaymentService {
             case UPI -> "UPI payment";
             default -> "Net banking payment";
         };
+    }
+
+    private BankAccount resolveDebitSourceAccount(PaymentRequest request) {
+        if (request.sourceAccountId() != null) {
+            BankAccount sourceAccount = bankAccountRepository.findById(request.sourceAccountId())
+                    .orElseThrow(() -> new NotFoundException("INVALID_ACCOUNT",
+                            "Source account not found: " + request.sourceAccountId()));
+            validateSourceOwnershipAndStatus(sourceAccount, request.payerId());
+            return sourceAccount;
+        }
+
+        if (request.paymentMethod() == PaymentMethod.NET_BANKING) {
+            throw new BadRequestException("VALIDATION_FAILED", "sourceAccountId is required for net banking");
+        }
+
+        return bankAccountRepository.findAll().stream()
+                .filter(BankAccount::isActive)
+                .filter(a -> a.getPayerId() == null || request.payerId().equals(a.getPayerId()))
+                .sorted(Comparator.comparing(a -> a.getPayerId() == null))
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("INVALID_ACCOUNT",
+                        "No active source account available for this payer"));
+    }
+
+    private void validateSourceOwnershipAndStatus(BankAccount sourceAccount, UUID payerId) {
+        if (sourceAccount.getPayerId() != null && !payerId.equals(sourceAccount.getPayerId())) {
+            throw new BadRequestException("INVALID_ACCOUNT", "Source account does not belong to current payer");
+        }
+        if (!sourceAccount.isActive()) {
+            throw new BadRequestException("INVALID_ACCOUNT", "Source account is inactive");
+        }
     }
 }
