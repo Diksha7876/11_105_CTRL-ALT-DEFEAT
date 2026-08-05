@@ -18,18 +18,26 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final ValidationService validationService;
     private final HistoryService historyService;
+    private final PaymentLifecycleService paymentLifecycleService;
+    private final PaymentFailureAuditService paymentFailureAuditService;
 
     public PaymentService(PaymentRepository paymentRepository,
-            ValidationService validationService, HistoryService historyService) {
+            ValidationService validationService,
+            HistoryService historyService,
+            PaymentLifecycleService paymentLifecycleService,
+            PaymentFailureAuditService paymentFailureAuditService) {
         this.paymentRepository = paymentRepository;
         this.validationService = validationService;
         this.historyService = historyService;
+        this.paymentLifecycleService = paymentLifecycleService;
+        this.paymentFailureAuditService = paymentFailureAuditService;
     }
 
     public PaymentCreationResult createPayment(PaymentRequest request, String idempotencyKey) {
         return paymentRepository.findByIdempotencyKey(idempotencyKey)
                 .map(p -> new PaymentCreationResult(toResponse(p), false))
                 .orElseGet(() -> {
+                    try {
                     validationService.validateAmount(request.amount());
                     validationService.validateCurrency(request.currency());
                     if (request.paymentMethod() == PaymentMethod.NET_BANKING && request.payerId() == null) {
@@ -62,7 +70,7 @@ public class PaymentService {
                             && request.payerId() != null
                             && paymentRepository.findByPayerIdAndInvoiceId(request.payerId(), invoiceId).isPresent()) {
                         throw new ConflictException("DUPLICATE_PAYMENT",
-                                "This invoice has already been paid by this payer");
+                            "This invoice has already been paid by this payer");
                     }
                     Payment payment = new Payment();
                     payment.setAmount(request.amount());
@@ -84,11 +92,16 @@ public class PaymentService {
                     }
                     payment.setInvoiceId(invoiceId);
                     payment.setIdempotencyKey(idempotencyKey);
-                    payment.setStatus(PaymentStatus.CREATED);
+                    payment.setStatus(PaymentStatus.SENT);
                     Payment saved = paymentRepository.save(payment);
-                    historyService.recordTransition(saved, null, PaymentStatus.CREATED, "Payment created", null,
-                            "API_CLIENT");
+                    historyService.recordTransition(saved, null, PaymentStatus.SENT, "Payment sent for processing", null,
+                        "SYSTEM");
+                    paymentLifecycleService.scheduleCompletion(saved.getPaymentId());
                     return new PaymentCreationResult(toResponse(saved), true);
+                    } catch (RuntimeException ex) {
+                    paymentFailureAuditService.persistFailedAttempt(request, idempotencyKey, ex);
+                    throw ex;
+                    }
                 });
     }
 
