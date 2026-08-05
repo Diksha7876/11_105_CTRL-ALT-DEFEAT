@@ -103,6 +103,7 @@ function CreatePaymentSection() {
     if (!form.reference.trim()) errors.reference = "Reference is required";
     if (!form.currency) errors.currency = "Currency is required";
     if (!form.paymentType) errors.paymentType = "Payment type is required";
+    if (!payerId) errors.payerId = "Current user payer ID is missing";
     if (form.paymentType === "BILL_PAYMENT" && !form.invoiceId.trim())
       errors.invoiceId = "Invoice ID is required for bill payment";
     setFormErrors(errors);
@@ -119,6 +120,7 @@ function CreatePaymentSection() {
       amount: Number(form.amount),
       currency: form.currency,
       reference: form.reference.trim(),
+      payerId,
       beneficiaryId: form.beneficiaryId,
       sourceAccountId: form.sourceAccountId,
       paymentType: form.paymentType,
@@ -270,6 +272,7 @@ function CreatePaymentSection() {
             <label className="field md:col-span-2">
               <span>Payer ID</span>
               <input className="input" value={payerId} readOnly />
+              {formErrors.payerId && <p className="error-text">{formErrors.payerId}</p>}
             </label>
 
             <div className="md:col-span-2 flex flex-wrap items-center gap-2">
