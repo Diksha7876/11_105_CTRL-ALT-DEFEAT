@@ -16,6 +16,13 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
     networks:
       - springboot-network
 
@@ -24,9 +31,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: springboot_container
+    restart: on-failure
 
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
     environment:
       DB_URL: jdbc:mysql://mysql:3306/paymentprocessing
@@ -45,8 +54,6 @@ services:
     container_name: frontend_container
     ports:
       - "8081:80"
-    depends_on:
-      - springboot-app
     networks:
       - springboot-network
 volumes:
