@@ -63,7 +63,7 @@ class BankAccountControllerTest {
 
     private BankAccountRequest request(String accountNumber, String holderName,
             UUID payerId, BigDecimal openingBalance, String accountType) {
-        return new BankAccountRequest(accountNumber, holderName, payerId, openingBalance, accountType);
+        return new BankAccountRequest(accountNumber, holderName, payerId, openingBalance, null, accountType);
     }
 
     // =========================================================================
