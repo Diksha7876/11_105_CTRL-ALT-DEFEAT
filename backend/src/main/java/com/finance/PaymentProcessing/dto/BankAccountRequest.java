@@ -10,5 +10,6 @@ public record BankAccountRequest(
 	@NotBlank String accountHolderName,
 	UUID payerId,
 	BigDecimal openingBalanceInr,
+	BigDecimal maxTransactionLimitInInr,
 	String accountType) {
 }

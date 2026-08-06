@@ -10,6 +10,7 @@ public class BankAccount {
     private UUID payerId;
     private String accountType = "SAVINGS";
     private BigDecimal balanceInInr = BigDecimal.ZERO;
+    private BigDecimal maxTransactionLimitInInr = new BigDecimal("1000000.00");
     private boolean active = true;
 
     public UUID getAccountId() { return accountId; }
@@ -24,6 +25,8 @@ public class BankAccount {
     public void setAccountType(String accountType) { this.accountType = accountType; }
     public BigDecimal getBalanceInInr() { return balanceInInr; }
     public void setBalanceInInr(BigDecimal balanceInInr) { this.balanceInInr = balanceInInr; }
+    public BigDecimal getMaxTransactionLimitInInr() { return maxTransactionLimitInInr; }
+    public void setMaxTransactionLimitInInr(BigDecimal maxTransactionLimitInInr) { this.maxTransactionLimitInInr = maxTransactionLimitInInr; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
 }

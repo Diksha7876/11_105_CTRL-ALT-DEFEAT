@@ -92,6 +92,15 @@ public class PaymentService {
                         : BigDecimal.ZERO;
                     BigDecimal debitAmountInInr = currencyConversionService.convertToInr(
                         request.amount(), request.currency());
+                    BigDecimal maxTransactionLimit = sourceAccount.getMaxTransactionLimitInInr() != null
+                        ? sourceAccount.getMaxTransactionLimitInInr()
+                        : new BigDecimal("1000000.00");
+
+                    if (debitAmountInInr.compareTo(maxTransactionLimit) > 0) {
+                        throw new BadRequestException("TRANSACTION_LIMIT_EXCEEDED",
+                            "Transaction exceeds source account limit. Maximum allowed INR "
+                                + maxTransactionLimit + ", requested INR " + debitAmountInInr);
+                    }
 
                     if (currentBalance.compareTo(debitAmountInInr) < 0) {
                         throw new BadRequestException("INSUFFICIENT_FUNDS",

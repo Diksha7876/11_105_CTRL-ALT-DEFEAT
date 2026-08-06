@@ -34,6 +34,8 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
         a.setAccountType(rs.getString("account_type"));
         BigDecimal balanceInInr = rs.getBigDecimal("balance_in_inr");
         a.setBalanceInInr(balanceInInr != null ? balanceInInr : BigDecimal.ZERO);
+        BigDecimal maxTransactionLimit = rs.getBigDecimal("max_transaction_limit_in_inr");
+        a.setMaxTransactionLimitInInr(maxTransactionLimit != null ? maxTransactionLimit : new BigDecimal("1000000.00"));
         a.setActive(rs.getBoolean("active"));
         return a;
     }
@@ -44,24 +46,26 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
             // INSERT: generate UUID here so MySQL receives it as a CHAR(36)
             account.setAccountId(UUID.randomUUID());
             jdbc.update(
-                "INSERT INTO bank_accounts (account_id, account_number, account_holder_name, payer_id, account_type, balance_in_inr, active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO bank_accounts (account_id, account_number, account_holder_name, payer_id, account_type, balance_in_inr, max_transaction_limit_in_inr, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 account.getAccountId().toString(),
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
                 account.getPayerId() != null ? account.getPayerId().toString() : null,
                 account.getAccountType(),
                 account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
+                account.getMaxTransactionLimitInInr() != null ? account.getMaxTransactionLimitInInr() : new BigDecimal("1000000.00"),
                 account.isActive()
             );
         } else {
             // UPDATE
             jdbc.update(
-                "UPDATE bank_accounts SET account_number = ?, account_holder_name = ?, payer_id = ?, account_type = ?, balance_in_inr = ?, active = ? WHERE account_id = ?",
+                "UPDATE bank_accounts SET account_number = ?, account_holder_name = ?, payer_id = ?, account_type = ?, balance_in_inr = ?, max_transaction_limit_in_inr = ?, active = ? WHERE account_id = ?",
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
                 account.getPayerId() != null ? account.getPayerId().toString() : null,
                 account.getAccountType(),
                 account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
+                account.getMaxTransactionLimitInInr() != null ? account.getMaxTransactionLimitInInr() : new BigDecimal("1000000.00"),
                 account.isActive(),
                 account.getAccountId().toString()
             );

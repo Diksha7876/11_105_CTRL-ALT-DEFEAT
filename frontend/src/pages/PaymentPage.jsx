@@ -86,6 +86,10 @@ function validatePaymentForm(form, payerId, beneficiaries, ownedAccounts) {
 
   const selectedAccount = ownedAccounts.find((a) => a.accountId === form.sourceAccountId) ?? null;
   const debitInInr = convertAmountToInr(form.amount, form.currency);
+  const maxLimitInInr = Number(selectedAccount?.maxTransactionLimitInInr ?? 1000000);
+  if (selectedAccount && debitInInr !== null && Number.isFinite(maxLimitInInr) && maxLimitInInr > 0 && debitInInr > maxLimitInInr) {
+    errors.amount = `Transaction exceeds account limit. Maximum INR ${maxLimitInInr.toFixed(2)}, requested INR ${debitInInr.toFixed(2)}`;
+  }
   const available = Number(selectedAccount?.balanceInInr ?? 0);
   if (selectedAccount && debitInInr !== null && available < debitInInr) {
     errors.amount = `Insufficient balance. Required INR ${debitInInr.toFixed(2)}, available INR ${available.toFixed(2)}`;
@@ -471,6 +475,11 @@ function CreatePaymentSection() {
                 onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
                 required
               />
+              {selectedSourceAccount && (
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  Account limit: {formatCurrency(selectedSourceAccount.maxTransactionLimitInInr ?? 1000000, "INR")}
+                </p>
+              )}
               {formErrors.amount && <p className="error-text">{formErrors.amount}</p>}
             </label>
 
@@ -487,14 +496,19 @@ function CreatePaymentSection() {
               </select>
             </label>
 
-            {selectedSourceAccount && convertedDebitInInr !== null && (
+            {selectedSourceAccount && (
               <div className="field md:col-span-2 rounded-lg border border-sky-300/60 bg-sky-50/70 px-3 py-2 text-sm text-sky-900 dark:border-sky-800/60 dark:bg-sky-900/30 dark:text-sky-100">
-                <p>
-                  INR balance debit for this payment:
-                  <span className="ml-2 font-semibold">
-                    {formatCurrency(convertedDebitInInr, "INR")}
-                  </span>
+                <p className="text-xs">
+                  Account limit: {formatCurrency(selectedSourceAccount.maxTransactionLimitInInr ?? 1000000, "INR")}
                 </p>
+                {convertedDebitInInr !== null && (
+                  <p className="mt-1">
+                    INR balance debit for this payment:
+                    <span className="ml-2 font-semibold">
+                      {formatCurrency(convertedDebitInInr, "INR")}
+                    </span>
+                  </p>
+                )}
                 <p className="mt-1 text-xs">
                   Available balance: {formatCurrency(selectedSourceAccount.balanceInInr, "INR")}
                 </p>
@@ -584,6 +598,7 @@ const initialAccountForm = {
   accountNumber: "",
   accountHolderName: "",
   openingBalanceInr: "50000",
+  maxTransactionLimitInInr: "1000000",
   accountType: "SAVINGS",
 };
 
@@ -636,6 +651,12 @@ function SourceAccountsSection() {
       errors.openingBalanceInr = "Opening balance cannot be negative";
     }
 
+    if (!form.maxTransactionLimitInInr) {
+      errors.maxTransactionLimitInInr = "Maximum transaction limit is required";
+    } else if (!(Number(form.maxTransactionLimitInInr) > 0)) {
+      errors.maxTransactionLimitInInr = "Maximum transaction limit must be greater than 0";
+    }
+
     if (!form.accountType) {
       errors.accountType = "Account type is required";
     }
@@ -655,6 +676,7 @@ function SourceAccountsSection() {
         accountHolderName: form.accountHolderName.trim(),
         payerId,
         openingBalanceInr: Number(form.openingBalanceInr),
+        maxTransactionLimitInInr: Number(form.maxTransactionLimitInInr),
         accountType: form.accountType,
       });
       toast.success("Source account created");
@@ -747,6 +769,21 @@ function SourceAccountsSection() {
               <p className="error-text">{formErrors.openingBalanceInr}</p>
             )}
           </label>
+          <label className="field">
+            <span>Maximum Transaction Limit (INR)</span>
+            <input
+              className="input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={form.maxTransactionLimitInInr}
+              onChange={(e) => setForm((p) => ({ ...p, maxTransactionLimitInInr: e.target.value }))}
+              required
+            />
+            {formErrors.maxTransactionLimitInInr && (
+              <p className="error-text">{formErrors.maxTransactionLimitInInr}</p>
+            )}
+          </label>
           <div className="md:col-span-2">
             <button type="submit" className="btn-primary" disabled={submitting}>
               {submitting ? "Creating..." : "Create Account"}
@@ -773,6 +810,7 @@ function SourceAccountsSection() {
                 <th className="pb-2">Holder Name</th>
                 <th className="pb-2">Type</th>
                 <th className="pb-2">Balance (INR)</th>
+                <th className="pb-2">Max Txn Limit (INR)</th>
                 <th className="pb-2">Active</th>
               </tr>
             </thead>
@@ -787,6 +825,7 @@ function SourceAccountsSection() {
                   <td className="py-3">{account.accountHolderName}</td>
                   <td className="py-3">{account.accountType ?? "SAVINGS"}</td>
                   <td className="py-3">{formatCurrency(account.balanceInInr, "INR")}</td>
+                  <td className="py-3">{formatCurrency(account.maxTransactionLimitInInr ?? 1000000, "INR")}</td>
                   <td className="py-3">{String(account.active ?? account.isActive ?? true)}</td>
                 </tr>
               ))}
