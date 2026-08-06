@@ -107,6 +107,9 @@ function validatePaymentForm(form, payerId, beneficiaries, ownedAccounts) {
   }
 
   if (form.paymentMethod === "CARD") {
+    if (!form.invoiceId.trim()) {
+      errors.invoiceId = "Invoice ID is required for card payment";
+    }
     if (!form.cardType) errors.cardType = "Card type is required";
     if (!form.cardHolderName.trim()) errors.cardHolderName = "Card holder name is required";
 
@@ -139,6 +142,9 @@ function validatePaymentForm(form, payerId, beneficiaries, ownedAccounts) {
   }
 
   if (form.paymentMethod === "UPI") {
+    if (!form.invoiceId.trim()) {
+      errors.invoiceId = "Invoice ID is required for UPI payment";
+    }
     if (!form.upiId.trim() || !upiIdRegex.test(form.upiId.trim())) {
       errors.upiId = "Enter a valid UPI ID (example@bank)";
     }
@@ -161,6 +167,7 @@ const initialPaymentForm = {
   expiryYear: "",
   cvv: "",
   upiId: "",
+  invoiceId: "",
 };
 
 function CreatePaymentSection() {
@@ -247,6 +254,9 @@ function CreatePaymentSection() {
       sourceAccountId: form.sourceAccountId,
       ...(payerId ? { payerId } : {}),
       ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
+      ...(form.paymentMethod === "CARD" || form.paymentMethod === "UPI"
+        ? { invoiceId: form.invoiceId.trim() }
+        : {}),
       ...(form.paymentMethod === "NET_BANKING"
           ? { beneficiaryId: form.beneficiaryId }
         : form.paymentMethod === "CARD"
@@ -336,6 +346,7 @@ function CreatePaymentSection() {
                           expiryYear: "",
                           cvv: "",
                           upiId: "",
+                          invoiceId: "",
                         }))
                       }
                     />
@@ -464,6 +475,20 @@ function CreatePaymentSection() {
               </label>
             )}
 
+            {(form.paymentMethod === "CARD" || form.paymentMethod === "UPI") && (
+              <label className="field md:col-span-2">
+                <span>Invoice ID</span>
+                <input
+                  className="input"
+                  value={form.invoiceId}
+                  onChange={(e) => setForm((p) => ({ ...p, invoiceId: e.target.value }))}
+                  placeholder="INV-2026-001"
+                  required
+                />
+                {formErrors.invoiceId && <p className="error-text">{formErrors.invoiceId}</p>}
+              </label>
+            )}
+
             <label className="field">
               <span>Amount</span>
               <input
@@ -573,6 +598,7 @@ function CreatePaymentSection() {
                 "cardLast4",
                 "cardHolderName",
                 "upiId",
+                "invoiceId",
                 "sourceAccountId",
                 "beneficiaryId",
                 "payerId",

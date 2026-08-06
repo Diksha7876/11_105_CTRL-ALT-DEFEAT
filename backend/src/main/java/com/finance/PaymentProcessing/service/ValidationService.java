@@ -51,15 +51,22 @@ public class ValidationService {
             throw new BadRequestException("INVALID_ACCOUNT", "Source and destination accounts must be different active accounts");
     }
 
-    public void validatePaymentDetails(PaymentType paymentType, String invoiceId) {
+    public void validatePaymentDetails(PaymentType paymentType, PaymentMethod paymentMethod, String invoiceId) {
         if (paymentType == null) {
             return;
         }
+        boolean hasInvoiceId = invoiceId != null && !invoiceId.isBlank();
         if (paymentType == PaymentType.BILL_PAYMENT && (invoiceId == null || invoiceId.isBlank())) {
             throw new BadRequestException("invoiceId is required for a bill payment");
         }
-        if (paymentType == PaymentType.BENEFICIARY_TRANSFER && invoiceId != null && !invoiceId.isBlank()) {
+        if (paymentType == PaymentType.BENEFICIARY_TRANSFER
+                && paymentMethod == PaymentMethod.NET_BANKING
+                && hasInvoiceId) {
             throw new BadRequestException("invoiceId must not be supplied for a beneficiary transfer");
+        }
+        if ((paymentMethod == PaymentMethod.CARD || paymentMethod == PaymentMethod.UPI)
+                && !hasInvoiceId) {
+            throw new BadRequestException("invoiceId is required for card and UPI payments");
         }
     }
 
