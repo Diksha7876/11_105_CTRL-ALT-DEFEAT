@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql_container
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: n3u3da!
+      MYSQL_DATABASE: paymentprocessing
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    networks:
+      - springboot-network
+
+  springboot-app:
+    build: .
+    container_name: springboot_container
+
+    depends_on:
+      - mysql
+
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:mysql://mysql:3306/paymentprocessing
+      DB_USER: root
+      DB_PASS: n3u3da!
+
+    ports:
+      - "8082:8082"
+
+    networks:
+      - springboot-network
+  nginx:
+    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx-server
+    ports:
+      - "8085:80"
+    depends_on:
+      - springboot-app
+    networks:
+      - springboot-network
+volumes:
+  mysql-data:
+
+networks:
+  springboot-network:
