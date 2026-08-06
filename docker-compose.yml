@@ -52,6 +52,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend_container
+    depends_on:
+      springboot-app:
+        condition: service_started
     ports:
       - "8081:80"
     networks:
