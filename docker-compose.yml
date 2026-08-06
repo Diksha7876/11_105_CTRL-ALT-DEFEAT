@@ -20,7 +20,9 @@ services:
       - springboot-network
 
   springboot-app:
-    build: .
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: springboot_container
 
     depends_on:
@@ -33,7 +35,7 @@ services:
       DB_PASS: n3u3da!
 
     ports:
-      - "8082:8082"
+      - "8082:8080"
 
     networks:
       - springboot-network
