@@ -38,14 +38,13 @@ services:
 
     networks:
       - springboot-network
-  nginx:
-    image: nginx:alpine
+  frontend:
     build:
-      context: ./nginx
+      context: ./frontend
       dockerfile: Dockerfile
-    container_name: nginx-server
+    container_name: frontend_container
     ports:
-      - "8085:80"
+      - "8081:80"
     depends_on:
       - springboot-app
     networks:
