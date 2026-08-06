@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import AsyncState from "../components/AsyncState";
+import BlockingIssuesModal from "../components/BlockingIssuesModal";
 import PageHeader from "../components/PageHeader";
 import SkeletonTable from "../components/SkeletonTable";
 import { useCurrentUser } from "../context/UserContext";
@@ -175,6 +176,7 @@ function CreatePaymentSection() {
   const [submitting, setSubmitting] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [createdPayment, setCreatedPayment] = useState(null);
+  const [blockingIssues, setBlockingIssues] = useState([]);
 
   const loadDependencies = useCallback(async () => {
     setLoading(true);
@@ -235,7 +237,10 @@ function CreatePaymentSection() {
 
   const onSubmit = async (event) => {
     event.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      setBlockingIssues(Object.values(validatePaymentForm(form, payerId, beneficiaries, ownedAccounts)));
+      return;
+    }
     setSubmitting(true);
     const retryKey = idempotencyKey || uuidv4();
     if (!idempotencyKey) setIdempotencyKey(retryKey);
@@ -475,6 +480,12 @@ function CreatePaymentSection() {
                 onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
                 required
               />
+              {convertedDebitInInr !== null && form.currency !== "INR" && (
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  Converted amount:
+                  <span className="ml-1 font-semibold">{formatCurrency(convertedDebitInInr, "INR")}</span>
+                </p>
+              )}
               {selectedSourceAccount && (
                 <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                   Account limit: {formatCurrency(selectedSourceAccount.maxTransactionLimitInInr ?? 1000000, "INR")}
@@ -534,7 +545,11 @@ function CreatePaymentSection() {
             )}
 
             <div className="md:col-span-2 flex flex-wrap items-center gap-2">
-              <button className="btn-primary" type="submit" disabled={!canSubmit}>
+              <button
+                className={`btn-primary${!canSubmit ? " cursor-not-allowed opacity-60" : ""}`}
+                type="submit"
+                disabled={loading || submitting}
+              >
                 {submitting ? "Submitting..." : "Submit Payment"}
               </button>
               {idempotencyKey && (
@@ -545,6 +560,11 @@ function CreatePaymentSection() {
             </div>
           </div>
         </form>
+        <BlockingIssuesModal
+          open={blockingIssues.length > 0}
+          issues={blockingIssues}
+          onClose={() => setBlockingIssues([])}
+        />
         <aside className="rounded-2xl border border-zinc-300/70 bg-white/80 p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/70 lg:col-span-2">
           <h3 className="text-lg font-semibold">Last Created Payment</h3>
           {!createdPayment ? (
