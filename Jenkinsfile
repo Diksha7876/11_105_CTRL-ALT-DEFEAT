@@ -19,7 +19,9 @@ pipeline {
 
         stage('Stop Existing Containers') {
             steps {
-                sh 'docker-compose down || true'
+                dir('backend') {
+                    sh 'docker-compose down || true'
+                }
             }
         }
 
@@ -27,13 +29,17 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker-compose build --no-cache'
+                dir('backend') {
+                    sh 'docker-compose build --no-cache'
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                sh 'docker-compose up -d'
+                dir('backend') {
+                    sh 'docker-compose up -d'
+                }
             }
         }
 
