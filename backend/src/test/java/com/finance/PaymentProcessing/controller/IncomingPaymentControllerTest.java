@@ -12,13 +12,12 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
 class IncomingPaymentControllerTest {
 
-    private static final UUID DEFAULT_PAYER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String DEFAULT_PAYER_ID = "111111111";
 
     private final IncomingPaymentController controller = new IncomingPaymentController();
 
@@ -33,7 +32,7 @@ class IncomingPaymentControllerTest {
     // -------------------------------------------------------------------------
 
     private IncomingPaymentRequest request(BigDecimal amount, String currency, String reference,
-            String sourceName, UUID destAccountId, Instant receivedAt) {
+            String sourceName, String destAccountId, Instant receivedAt) {
         return new IncomingPaymentRequest(amount, currency, reference, sourceName, destAccountId, receivedAt);
     }
 
@@ -101,7 +100,7 @@ class IncomingPaymentControllerTest {
     void createIncomingPayment_locationHeaderPointsToNewResource() {
         ResponseEntity<IncomingPaymentResponse> response = controller.createIncomingPayment(minimalRequest());
 
-        UUID id = response.getBody().incomingPaymentId();
+        String id = response.getBody().incomingPaymentId();
         assertThat(response.getHeaders().getLocation())
                 .hasToString("/api/incoming-payments/" + id);
     }
@@ -119,8 +118,8 @@ class IncomingPaymentControllerTest {
 
     @Test
     void createIncomingPayment_generatesUniqueIds() {
-        UUID id1 = controller.createIncomingPayment(minimalRequest()).getBody().incomingPaymentId();
-        UUID id2 = controller.createIncomingPayment(minimalRequest()).getBody().incomingPaymentId();
+        String id1 = controller.createIncomingPayment(minimalRequest()).getBody().incomingPaymentId();
+        String id2 = controller.createIncomingPayment(minimalRequest()).getBody().incomingPaymentId();
 
         assertThat(id1).isNotEqualTo(id2);
     }
@@ -168,7 +167,7 @@ class IncomingPaymentControllerTest {
 
     @Test
     void createIncomingPayment_destinationAccountIdPreserved() {
-        UUID destId = UUID.randomUUID();
+        String destId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         IncomingPaymentRequest req = request(new BigDecimal("50"), "INR", "REF", "Src", destId, null);
 
         IncomingPaymentResponse body = controller.createIncomingPayment(req).getBody();

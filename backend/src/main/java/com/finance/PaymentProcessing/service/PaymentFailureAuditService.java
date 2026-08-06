@@ -13,7 +13,6 @@ import com.finance.PaymentProcessing.repository.BankAccountRepository;
 import com.finance.PaymentProcessing.repository.BeneficiaryRepository;
 import com.finance.PaymentProcessing.repository.PaymentRepository;
 import java.math.BigDecimal;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,13 +38,13 @@ public class PaymentFailureAuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void persistFailedAttempt(PaymentRequest request, String idempotencyKey, RuntimeException ex) {
-        UUID beneficiaryId = resolveBeneficiaryId(request.beneficiaryId());
+        String beneficiaryId = resolveBeneficiaryId(request.beneficiaryId());
         if (beneficiaryId == null) {
             return;
         }
 
         try {
-            UUID sourceAccountId = resolveSourceAccountId(request.sourceAccountId());
+            String sourceAccountId = resolveSourceAccountId(request.sourceAccountId());
             Payment failed = new Payment();
             failed.setAmount(sanitizeAmount(request.amount()));
             failed.setCurrency(sanitizeCurrency(request.currency()));
@@ -60,7 +59,7 @@ public class PaymentFailureAuditService {
             failed.setCardLast4(sanitizeCardLast4(request.cardNumber()));
             failed.setUpiId(sanitizeUpiId(request.upiId()));
             failed.setInvoiceId(null);
-            failed.setIdempotencyKey(idempotencyKey + "-FAILED-" + UUID.randomUUID());
+            failed.setIdempotencyKey(idempotencyKey + "-FAILED-" + com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
             failed.setStatus(PaymentStatus.FAILED);
 
             Payment saved = paymentRepository.save(failed);
@@ -71,7 +70,7 @@ public class PaymentFailureAuditService {
         }
     }
 
-    private UUID resolveBeneficiaryId(UUID requestedId) {
+    private String resolveBeneficiaryId(String requestedId) {
         if (requestedId != null && beneficiaryRepository.existsById(requestedId)) {
             return requestedId;
         }
@@ -81,7 +80,7 @@ public class PaymentFailureAuditService {
                 .orElse(null);
     }
 
-    private UUID resolveSourceAccountId(UUID requestedId) {
+    private String resolveSourceAccountId(String requestedId) {
         if (requestedId != null && bankAccountRepository.existsById(requestedId)) {
             return requestedId;
         }

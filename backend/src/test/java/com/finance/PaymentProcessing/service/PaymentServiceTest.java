@@ -21,7 +21,6 @@ import org.springframework.data.domain.Pageable;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -41,18 +40,18 @@ class PaymentServiceTest {
     @InjectMocks
     private PaymentService service;
 
-    private UUID paymentId;
-    private UUID payerId;
-    private UUID sourceAccountId;
-    private UUID beneficiaryId;
+    private String paymentId;
+    private String payerId;
+    private String sourceAccountId;
+    private String beneficiaryId;
     private String idempotencyKey;
 
     @BeforeEach
     void setUp() {
-        paymentId     = UUID.randomUUID();
-        payerId       = UUID.randomUUID();
-        sourceAccountId = UUID.randomUUID();
-        beneficiaryId = UUID.randomUUID();
+        paymentId     = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        payerId       = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        sourceAccountId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        beneficiaryId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         idempotencyKey = "test-idem-key-001";
     }
 
@@ -223,7 +222,7 @@ class PaymentServiceTest {
     void createPayment_sourceAccountBelongsToDifferentPayer_throwsBadRequestAndTriggersAudit() {
         BankAccount foreignAccount = new BankAccount();
         foreignAccount.setAccountId(sourceAccountId);
-        foreignAccount.setPayerId(UUID.randomUUID()); // different payer
+        foreignAccount.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId()); // different payer
         foreignAccount.setBalanceInInr(new BigDecimal("9999"));
         foreignAccount.setActive(true);
         when(paymentRepository.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
@@ -258,7 +257,7 @@ class PaymentServiceTest {
                 PaymentType.BENEFICIARY_TRANSFER, null);
 
         BankAccount shared = new BankAccount();
-        UUID sharedId = UUID.randomUUID();
+        String sharedId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         shared.setAccountId(sharedId);
         shared.setPayerId(payerId);
         shared.setBalanceInInr(new BigDecimal("9999"));
@@ -571,7 +570,7 @@ class PaymentServiceTest {
 
     @Test
     void getPayment_notFound_throwsNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(paymentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getPayment(unknownId))
@@ -604,7 +603,7 @@ class PaymentServiceTest {
 
     @Test
     void updateStatus_paymentNotFound_throwsNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(paymentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateStatus(unknownId,

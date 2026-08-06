@@ -109,7 +109,7 @@ export default function SourceAccountsPage() {
                 type="button"
                 className="btn-primary whitespace-nowrap"
                 onClick={() =>
-                  setForm((prev) => ({ ...prev, accountId: crypto.randomUUID() }))
+                  setForm((prev) => ({ ...prev, accountId: String(100000000 + Math.floor(Math.random() * 900000000)) }))
                 }
               >
                 Generate Unique ID

@@ -23,7 +23,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -40,17 +39,17 @@ class PaymentFailureAuditServiceTest {
     @InjectMocks
     private PaymentFailureAuditService service;
 
-    private UUID payerId;
-    private UUID beneficiaryId;
-    private UUID sourceAccountId;
+    private String payerId;
+    private String beneficiaryId;
+    private String sourceAccountId;
     private String idempotencyKey;
     private RuntimeException cause;
 
     @BeforeEach
     void setUp() {
-        payerId        = UUID.randomUUID();
-        beneficiaryId  = UUID.randomUUID();
-        sourceAccountId = UUID.randomUUID();
+        payerId        = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        beneficiaryId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        sourceAccountId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         idempotencyKey = "idem-key-001";
         cause          = new BadRequestException("VALIDATION_FAILED", "bad input");
     }
@@ -60,7 +59,7 @@ class PaymentFailureAuditServiceTest {
     // -------------------------------------------------------------------------
 
     /** Builds a minimal valid PaymentRequest. Override individual fields per test. */
-    private PaymentRequest request(UUID beneId, UUID srcId, BigDecimal amount,
+    private PaymentRequest request(String beneId, String srcId, BigDecimal amount,
             String currency, String reference, PaymentMethod method,
             PaymentType type, String cardNumber, String cardHolder,
             String upiId) {
@@ -76,7 +75,7 @@ class PaymentFailureAuditServiceTest {
                 null, null, null);
     }
 
-    private Beneficiary stubBeneficiary(UUID id) {
+    private Beneficiary stubBeneficiary(String id) {
         Beneficiary b = new Beneficiary();
         b.setBeneficiaryId(id);
         return b;
@@ -84,7 +83,7 @@ class PaymentFailureAuditServiceTest {
 
     private Payment stubSavedPayment() {
         Payment p = new Payment();
-        p.setPaymentId(UUID.randomUUID());
+        p.setPaymentId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         p.setStatus(PaymentStatus.FAILED);
         return p;
     }
@@ -109,7 +108,7 @@ class PaymentFailureAuditServiceTest {
 
     @Test
     void persistFailedAttempt_withNullBeneficiaryId_fallsBackToFirstBeneficiary() {
-        UUID fallbackId = UUID.randomUUID();
+        String fallbackId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Beneficiary fallback = stubBeneficiary(fallbackId);
 
         // existsById is never called when requestedId is null (short-circuit &&)
@@ -129,8 +128,8 @@ class PaymentFailureAuditServiceTest {
 
     @Test
     void persistFailedAttempt_withUnknownBeneficiaryId_fallsBackToFirstBeneficiary() {
-        UUID unknownBeneId = UUID.randomUUID();
-        UUID fallbackId = UUID.randomUUID();
+        String unknownBeneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String fallbackId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Beneficiary fallback = stubBeneficiary(fallbackId);
 
         when(beneficiaryRepository.existsById(unknownBeneId)).thenReturn(false);

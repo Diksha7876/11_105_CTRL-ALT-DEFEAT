@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -90,14 +89,14 @@ class ValidationServiceTest {
 
     @Test
     void validateBeneficiary_exists_doesNotThrow() {
-        UUID id = UUID.randomUUID();
+        String id = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(beneficiaryRepository.existsById(id)).thenReturn(true);
         assertThatCode(() -> service.validateBeneficiary(id)).doesNotThrowAnyException();
     }
 
     @Test
     void validateBeneficiary_notFound_throwsNotFoundException() {
-        UUID id = UUID.randomUUID();
+        String id = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(beneficiaryRepository.existsById(id)).thenReturn(false);
         assertThatThrownBy(() -> service.validateBeneficiary(id))
                 .isInstanceOf(NotFoundException.class)
@@ -108,7 +107,7 @@ class ValidationServiceTest {
     // validateSourceAccount
     // =========================================================================
 
-    private BankAccount activeAccount(UUID accountId, String accountNumber) {
+    private BankAccount activeAccount(String accountId, String accountNumber) {
         BankAccount a = new BankAccount();
         a.setAccountId(accountId);
         a.setAccountNumber(accountNumber);
@@ -116,7 +115,7 @@ class ValidationServiceTest {
         return a;
     }
 
-    private Beneficiary beneficiary(UUID beneficiaryId, String accountNumber) {
+    private Beneficiary beneficiary(String beneficiaryId, String accountNumber) {
         Beneficiary b = new Beneficiary();
         b.setBeneficiaryId(beneficiaryId);
         b.setAccountNumber(accountNumber);
@@ -125,8 +124,8 @@ class ValidationServiceTest {
 
     @Test
     void validateSourceAccount_validDifferentAccounts_doesNotThrow() {
-        UUID srcId  = UUID.randomUUID();
-        UUID beneId = UUID.randomUUID();
+        String srcId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String beneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(accountRepository.findById(srcId))
                 .thenReturn(Optional.of(activeAccount(srcId, "ACC-001")));
         when(beneficiaryRepository.findById(beneId))
@@ -137,8 +136,8 @@ class ValidationServiceTest {
 
     @Test
     void validateSourceAccount_sourceAccountNotFound_throwsNotFoundException() {
-        UUID srcId  = UUID.randomUUID();
-        UUID beneId = UUID.randomUUID();
+        String srcId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String beneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(accountRepository.findById(srcId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.validateSourceAccount(srcId, beneId))
@@ -148,8 +147,8 @@ class ValidationServiceTest {
 
     @Test
     void validateSourceAccount_beneficiaryNotFound_throwsNotFoundException() {
-        UUID srcId  = UUID.randomUUID();
-        UUID beneId = UUID.randomUUID();
+        String srcId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String beneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(accountRepository.findById(srcId))
                 .thenReturn(Optional.of(activeAccount(srcId, "ACC-001")));
         when(beneficiaryRepository.findById(beneId)).thenReturn(Optional.empty());
@@ -161,8 +160,8 @@ class ValidationServiceTest {
 
     @Test
     void validateSourceAccount_inactiveSourceAccount_throwsBadRequest() {
-        UUID srcId  = UUID.randomUUID();
-        UUID beneId = UUID.randomUUID();
+        String srcId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String beneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         BankAccount inactive = activeAccount(srcId, "ACC-001");
         inactive.setActive(false);
         when(accountRepository.findById(srcId)).thenReturn(Optional.of(inactive));
@@ -177,8 +176,8 @@ class ValidationServiceTest {
 
     @Test
     void validateSourceAccount_sameAccountNumber_throwsBadRequest() {
-        UUID srcId  = UUID.randomUUID();
-        UUID beneId = UUID.randomUUID();
+        String srcId  = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String beneId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(accountRepository.findById(srcId))
                 .thenReturn(Optional.of(activeAccount(srcId, "SAME-ACCOUNT")));
         when(beneficiaryRepository.findById(beneId))
@@ -266,7 +265,7 @@ class ValidationServiceTest {
     @Test
     void validateMethodSpecificDetails_netBanking_valid_doesNotThrow() {
         assertThatCode(() -> service.validateMethodSpecificDetails(
-                PaymentMethod.NET_BANKING, UUID.randomUUID(),
+                PaymentMethod.NET_BANKING, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null, null, null))
                 .doesNotThrowAnyException();
     }
@@ -283,7 +282,7 @@ class ValidationServiceTest {
     @Test
     void validateMethodSpecificDetails_netBanking_cardTypePresent_throwsBadRequest() {
         assertThatThrownBy(() -> service.validateMethodSpecificDetails(
-                PaymentMethod.NET_BANKING, UUID.randomUUID(),
+                PaymentMethod.NET_BANKING, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 CardType.CREDIT_CARD, null, null, null, null, null, null))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("card fields are not allowed for net banking");
@@ -292,7 +291,7 @@ class ValidationServiceTest {
     @Test
     void validateMethodSpecificDetails_netBanking_upiIdPresent_throwsBadRequest() {
         assertThatThrownBy(() -> service.validateMethodSpecificDetails(
-                PaymentMethod.NET_BANKING, UUID.randomUUID(),
+                PaymentMethod.NET_BANKING, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null, null, "user@upi"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("card fields are not allowed for net banking");
@@ -314,7 +313,7 @@ class ValidationServiceTest {
     @Test
     void validateMethodSpecificDetails_upi_beneficiaryIdPresent_throwsBadRequest() {
         assertThatThrownBy(() -> service.validateMethodSpecificDetails(
-                PaymentMethod.UPI, UUID.randomUUID(),
+                PaymentMethod.UPI, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null, null, "user@upi"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("beneficiaryId must not be supplied for UPI");
@@ -362,7 +361,7 @@ class ValidationServiceTest {
     @Test
     void validateMethodSpecificDetails_card_beneficiaryIdPresent_throwsBadRequest() {
         assertThatThrownBy(() -> service.validateMethodSpecificDetails(
-                PaymentMethod.CARD, UUID.randomUUID(),
+                PaymentMethod.CARD, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 CardType.CREDIT_CARD, "John", "4532015112830366",
                 "12", futureYear(), "123", null))
                 .isInstanceOf(BadRequestException.class)

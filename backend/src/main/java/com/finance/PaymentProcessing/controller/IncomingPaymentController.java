@@ -9,7 +9,6 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class IncomingPaymentController {
 
-    private static final UUID DEFAULT_PAYER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String DEFAULT_PAYER_ID = "111111111";
     private static final List<IncomingPaymentResponse> STORE = new CopyOnWriteArrayList<>();
 
     @GetMapping("/api/users/current")
@@ -40,7 +39,7 @@ public class IncomingPaymentController {
     ) {
         Instant now = Instant.now();
         IncomingPaymentResponse created = new IncomingPaymentResponse(
-            UUID.randomUUID(),
+            com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
             DEFAULT_PAYER_ID,
             sanitizeAmount(request.amount()),
             request.currency().trim(),

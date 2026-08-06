@@ -20,7 +20,6 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -34,26 +33,26 @@ class PaymentControllerTest {
     @InjectMocks
     private PaymentController controller;
 
-    private UUID paymentId;
+    private String paymentId;
     private String idempotencyKey;
     private PaymentResponse sampleResponse;
     private PaymentRequest sampleRequest;
 
     @BeforeEach
     void setUp() {
-        paymentId     = UUID.randomUUID();
+        paymentId     = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         idempotencyKey = "idem-key-001";
 
         sampleResponse = new PaymentResponse(
                 paymentId, new BigDecimal("200.00"), "INR", "REF-001",
                 PaymentStatus.SENT, PaymentType.BENEFICIARY_TRANSFER,
                 PaymentMethod.NET_BANKING, null,
-                UUID.randomUUID(), null, UUID.randomUUID(), UUID.randomUUID(),
+                com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), null, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null);
 
         sampleRequest = new PaymentRequest(
-                new BigDecimal("200.00"), "INR", "REF-001", UUID.randomUUID(),
-                PaymentMethod.NET_BANKING, UUID.randomUUID(), UUID.randomUUID(),
+                new BigDecimal("200.00"), "INR", "REF-001", com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
+                PaymentMethod.NET_BANKING, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null, null, null,
                 PaymentType.BENEFICIARY_TRANSFER, null);
     }
@@ -123,7 +122,7 @@ class PaymentControllerTest {
 
     @Test
     void getPayment_unknownId_propagatesNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(service.getPayment(unknownId))
                 .thenThrow(new NotFoundException("Payment not found: " + unknownId));
 
@@ -144,7 +143,7 @@ class PaymentControllerTest {
                 paymentId, new BigDecimal("200.00"), "INR", "REF-001",
                 PaymentStatus.COMPLETED, PaymentType.BENEFICIARY_TRANSFER,
                 PaymentMethod.NET_BANKING, null,
-                UUID.randomUUID(), null, UUID.randomUUID(), UUID.randomUUID(),
+                com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), null, com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(),
                 null, null, null, null, null);
         when(service.updateStatus(paymentId, statusRequest)).thenReturn(updated);
 
@@ -156,7 +155,7 @@ class PaymentControllerTest {
 
     @Test
     void updatePaymentStatus_unknownId_propagatesNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         PaymentStatusRequest statusRequest = new PaymentStatusRequest(
                 PaymentStatus.COMPLETED, null, null, null);
         when(service.updateStatus(unknownId, statusRequest))

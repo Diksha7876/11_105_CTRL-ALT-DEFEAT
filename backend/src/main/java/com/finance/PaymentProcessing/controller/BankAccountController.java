@@ -9,14 +9,13 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/accounts")
 public class BankAccountController {
-    private static final UUID DEFAULT_PAYER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String DEFAULT_PAYER_ID = "111111111";
     private static final Set<String> SUPPORTED_ACCOUNT_TYPES = Set.of("SAVINGS", "CURRENT", "SALARY");
     private static final BigDecimal DEFAULT_MAX_TXN_LIMIT_INR = new BigDecimal("1000000.00");
 
@@ -57,7 +56,7 @@ public class BankAccountController {
 
     @PatchMapping("/{accountId}/limit")
     public ResponseEntity<BankAccountResponse> updateTransactionLimit(
-            @PathVariable UUID accountId,
+            @PathVariable String accountId,
             @Valid @RequestBody BankAccountLimitUpdateRequest request) {
         BankAccount account = repository.findById(accountId)
             .orElseThrow(() -> new BadRequestException("INVALID_ACCOUNT", "Source account not found: " + accountId));

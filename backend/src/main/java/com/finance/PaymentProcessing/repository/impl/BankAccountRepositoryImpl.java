@@ -7,7 +7,6 @@ import java.sql.SQLException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -26,11 +25,11 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
 
     private static BankAccount map(ResultSet rs) throws SQLException {
         BankAccount a = new BankAccount();
-        a.setAccountId(UUID.fromString(rs.getString("account_id")));
+        a.setAccountId(rs.getString("account_id"));
         a.setAccountNumber(rs.getString("account_number"));
         a.setAccountHolderName(rs.getString("account_holder_name"));
         String payerId = rs.getString("payer_id");
-        a.setPayerId(payerId != null ? UUID.fromString(payerId) : null);
+        a.setPayerId(payerId);
         a.setAccountType(rs.getString("account_type"));
         BigDecimal balanceInInr = rs.getBigDecimal("balance_in_inr");
         a.setBalanceInInr(balanceInInr != null ? balanceInInr : BigDecimal.ZERO);
@@ -43,14 +42,14 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
     @Override
     public BankAccount save(BankAccount account) {
         if (account.getAccountId() == null) {
-            // INSERT: generate UUID here so MySQL receives it as a CHAR(36)
-            account.setAccountId(UUID.randomUUID());
+            // INSERT: generate String here so MySQL receives it as a CHAR(36)
+            account.setAccountId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
             jdbc.update(
                 "INSERT INTO bank_accounts (account_id, account_number, account_holder_name, payer_id, account_type, balance_in_inr, max_transaction_limit_in_inr, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                account.getAccountId().toString(),
+                account.getAccountId(),
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
-                account.getPayerId() != null ? account.getPayerId().toString() : null,
+                account.getPayerId(),
                 account.getAccountType(),
                 account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
                 account.getMaxTransactionLimitInInr() != null ? account.getMaxTransactionLimitInInr() : new BigDecimal("1000000.00"),
@@ -62,23 +61,23 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
                 "UPDATE bank_accounts SET account_number = ?, account_holder_name = ?, payer_id = ?, account_type = ?, balance_in_inr = ?, max_transaction_limit_in_inr = ?, active = ? WHERE account_id = ?",
                 account.getAccountNumber(),
                 account.getAccountHolderName(),
-                account.getPayerId() != null ? account.getPayerId().toString() : null,
+                account.getPayerId(),
                 account.getAccountType(),
                 account.getBalanceInInr() != null ? account.getBalanceInInr() : BigDecimal.ZERO,
                 account.getMaxTransactionLimitInInr() != null ? account.getMaxTransactionLimitInInr() : new BigDecimal("1000000.00"),
                 account.isActive(),
-                account.getAccountId().toString()
+                account.getAccountId()
             );
         }
         return account;
     }
 
     @Override
-    public Optional<BankAccount> findById(UUID id) {
+    public Optional<BankAccount> findById(String id) {
         List<BankAccount> results = jdbc.query(
             "SELECT * FROM bank_accounts WHERE account_id = ?",
             ROW_MAPPER,
-            id.toString()
+            id
         );
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -89,11 +88,11 @@ public class BankAccountRepositoryImpl implements BankAccountRepository {
     }
 
     @Override
-    public boolean existsById(UUID id) {
+    public boolean existsById(String id) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM bank_accounts WHERE account_id = ?",
             Integer.class,
-            id.toString()
+            id
         );
         return count != null && count > 0;
     }

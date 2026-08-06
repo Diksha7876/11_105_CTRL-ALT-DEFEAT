@@ -14,7 +14,6 @@ import org.springframework.jdbc.core.RowMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -29,17 +28,17 @@ class BankAccountRepositoryImplTest {
     @InjectMocks
     private BankAccountRepositoryImpl repository;
 
-    private UUID accountId;
+    private String accountId;
     private BankAccount account;
 
     @BeforeEach
     void setUp() {
-        accountId = UUID.randomUUID();
+        accountId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         account = new BankAccount();
         account.setAccountId(accountId);
         account.setAccountNumber("ACC123456");
         account.setAccountHolderName("Alice");
-        account.setPayerId(UUID.randomUUID());
+        account.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         account.setAccountType("SAVINGS");
         account.setBalanceInInr(new BigDecimal("5000.00"));
         account.setActive(true);
@@ -175,7 +174,7 @@ class BankAccountRepositoryImplTest {
         when(jdbc.query(anyString(), any(RowMapper.class), anyString()))
                 .thenReturn(List.of());
 
-        Optional<BankAccount> result = repository.findById(UUID.randomUUID());
+        Optional<BankAccount> result = repository.findById(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
 
         assertThat(result).isEmpty();
     }
@@ -199,7 +198,7 @@ class BankAccountRepositoryImplTest {
     @Test
     void findAll_returnsAllAccounts() {
         BankAccount second = new BankAccount();
-        second.setAccountId(UUID.randomUUID());
+        second.setAccountId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         when(jdbc.query(anyString(), any(RowMapper.class))).thenReturn(List.of(account, second));
 
         List<BankAccount> result = repository.findAll();
