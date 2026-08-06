@@ -14,7 +14,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -63,7 +62,7 @@ class PaymentLifecycleServiceTest {
         captor.getValue().run();
     }
 
-    private Payment sentPayment(UUID id) {
+    private Payment sentPayment(String id) {
         Payment p = new Payment();
         p.setPaymentId(id);
         p.setStatus(PaymentStatus.SENT);
@@ -76,7 +75,7 @@ class PaymentLifecycleServiceTest {
 
     @Test
     void scheduleCompletion_submitsTaskWith30SecondDelay() {
-        service.scheduleCompletion(UUID.randomUUID());
+        service.scheduleCompletion(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
 
         verify(mockScheduler).schedule(any(Runnable.class), eq(30L), eq(TimeUnit.SECONDS));
     }
@@ -84,7 +83,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void scheduleCompletion_taskWrappedInsideTransactionTemplate() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.empty());
 
         service.scheduleCompletion(paymentId);
@@ -100,7 +99,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_sentPayment_transitionsToCompletedAndSaves() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = sentPayment(paymentId);
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
         when(paymentRepository.save(payment)).thenReturn(payment);
@@ -115,7 +114,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_sentPayment_recordsHistoryTransition() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = sentPayment(paymentId);
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(payment));
         when(paymentRepository.save(payment)).thenReturn(payment);
@@ -139,7 +138,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_createdPayment_isIgnored() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = new Payment();
         payment.setPaymentId(paymentId);
         payment.setStatus(PaymentStatus.CREATED);
@@ -156,7 +155,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_validatedPayment_isIgnored() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = new Payment();
         payment.setPaymentId(paymentId);
         payment.setStatus(PaymentStatus.VALIDATED);
@@ -172,7 +171,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_alreadyCompletedPayment_isIgnored() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = new Payment();
         payment.setPaymentId(paymentId);
         payment.setStatus(PaymentStatus.COMPLETED);
@@ -188,7 +187,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_failedPayment_isIgnored() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Payment payment = new Payment();
         payment.setPaymentId(paymentId);
         payment.setStatus(PaymentStatus.FAILED);
@@ -204,7 +203,7 @@ class PaymentLifecycleServiceTest {
     @Test
     void completeIfSent_paymentNotFound_doesNothing() {
         executeTransactionInline();
-        UUID paymentId = UUID.randomUUID();
+        String paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.empty());
 
         service.scheduleCompletion(paymentId);

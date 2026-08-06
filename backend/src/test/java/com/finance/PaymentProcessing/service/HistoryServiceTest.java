@@ -20,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,12 +37,12 @@ class HistoryServiceTest {
     @InjectMocks
     private HistoryService service;
 
-    private UUID paymentId;
+    private String paymentId;
     private Payment payment;
 
     @BeforeEach
     void setUp() {
-        paymentId = UUID.randomUUID();
+        paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
 
         payment = new Payment();
         payment.setPaymentId(paymentId);
@@ -130,8 +129,8 @@ class HistoryServiceTest {
 
     @Test
     void getHistory_existingPayment_returnsMappedResponsesInOrder() {
-        UUID histId1 = UUID.randomUUID();
-        UUID histId2 = UUID.randomUUID();
+        String histId1 = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String histId2 = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         Instant t1 = Instant.parse("2024-01-01T10:00:00Z");
         Instant t2 = Instant.parse("2024-01-01T11:00:00Z");
 
@@ -178,7 +177,7 @@ class HistoryServiceTest {
 
     @Test
     void getHistory_failedTransition_mapsErrorCodeAndRemarks() {
-        UUID histId = UUID.randomUUID();
+        String histId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         PaymentHistory h = buildHistory(histId, paymentId, PaymentStatus.VALIDATED,
                 PaymentStatus.FAILED, Instant.now(), "rejected by bank", "BANK_REJECT_001", "BANK_GW");
 
@@ -200,7 +199,7 @@ class HistoryServiceTest {
 
     @Test
     void getHistory_unknownPaymentId_throwsNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(paymentRepository.existsById(unknownId)).thenReturn(false);
 
         assertThatThrownBy(() -> service.getHistory(unknownId))
@@ -214,7 +213,7 @@ class HistoryServiceTest {
     // helper
     // -------------------------------------------------------------------------
 
-    private PaymentHistory buildHistory(UUID histId, UUID pmtId, PaymentStatus oldStatus,
+    private PaymentHistory buildHistory(String histId, String pmtId, PaymentStatus oldStatus,
             PaymentStatus newStatus, Instant timestamp, String remarks,
             String errorCode, String actor) {
         PaymentHistory h = new PaymentHistory();

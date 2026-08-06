@@ -13,7 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -27,16 +26,16 @@ class HistoryControllerTest {
     @InjectMocks
     private HistoryController controller;
 
-    private UUID paymentId;
+    private String paymentId;
     private List<PaymentHistoryResponse> sampleHistory;
 
     @BeforeEach
     void setUp() {
-        paymentId = UUID.randomUUID();
+        paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         sampleHistory = List.of(
-                new PaymentHistoryResponse(UUID.randomUUID(), PaymentStatus.CREATED,
+                new PaymentHistoryResponse(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), PaymentStatus.CREATED,
                         PaymentStatus.VALIDATED, Instant.now(), "validated ok", null, "SYS"),
-                new PaymentHistoryResponse(UUID.randomUUID(), PaymentStatus.VALIDATED,
+                new PaymentHistoryResponse(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), PaymentStatus.VALIDATED,
                         PaymentStatus.SENT, Instant.now(), null, null, "OPS"));
     }
 
@@ -65,7 +64,7 @@ class HistoryControllerTest {
 
     @Test
     void getPaymentHistory_unknownPaymentId_propagatesNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(service.getHistory(unknownId))
                 .thenThrow(new NotFoundException("Payment not found: " + unknownId));
 
@@ -99,7 +98,7 @@ class HistoryControllerTest {
 
     @Test
     void getTransactionTimeline_unknownPaymentId_propagatesNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(service.getHistory(unknownId))
                 .thenThrow(new NotFoundException("Payment not found: " + unknownId));
 

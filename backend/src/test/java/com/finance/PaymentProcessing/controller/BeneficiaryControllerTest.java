@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,13 +28,13 @@ class BeneficiaryControllerTest {
     @InjectMocks
     private BeneficiaryController controller;
 
-    private UUID beneficiaryId;
+    private String beneficiaryId;
     private BeneficiaryResponse sampleResponse;
     private BeneficiaryRequest sampleRequest;
 
     @BeforeEach
     void setUp() {
-        beneficiaryId = UUID.randomUUID();
+        beneficiaryId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         sampleResponse = new BeneficiaryResponse(
                 beneficiaryId, "John Doe", "ACC123456",
                 "HDFC Bank", "HDFC0001234", "john@example.com", "9876543210");
@@ -87,7 +86,7 @@ class BeneficiaryControllerTest {
     @Test
     void listBeneficiaries_delegatesToService_returnsResults() {
         BeneficiaryResponse second = new BeneficiaryResponse(
-                UUID.randomUUID(), "Jane Smith", "ACC999888",
+                com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), "Jane Smith", "ACC999888",
                 "SBI", "SBIN0005678", "jane@example.com", null);
         when(service.listBeneficiaries()).thenReturn(List.of(sampleResponse, second));
 
@@ -123,7 +122,7 @@ class BeneficiaryControllerTest {
 
     @Test
     void getBeneficiary_unknownId_propagatesNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(service.getBeneficiary(unknownId))
                 .thenThrow(new NotFoundException("Beneficiary not found: " + unknownId));
 

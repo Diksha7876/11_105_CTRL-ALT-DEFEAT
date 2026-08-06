@@ -15,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,13 +29,13 @@ class BeneficiaryServiceTest {
     @InjectMocks
     private BeneficiaryService service;
 
-    private UUID beneficiaryId;
+    private String beneficiaryId;
     private Beneficiary savedBeneficiary;
     private BeneficiaryRequest validRequest;
 
     @BeforeEach
     void setUp() {
-        beneficiaryId = UUID.randomUUID();
+        beneficiaryId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
 
         validRequest = new BeneficiaryRequest(
                 "John Doe",
@@ -88,7 +87,7 @@ class BeneficiaryServiceTest {
         );
 
         Beneficiary persisted = new Beneficiary();
-        persisted.setBeneficiaryId(UUID.randomUUID());
+        persisted.setBeneficiaryId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         persisted.setName("Jane Smith");
         persisted.setAccountNumber("ACC654321");
         persisted.setBankName("SBI");
@@ -126,7 +125,7 @@ class BeneficiaryServiceTest {
     @Test
     void listBeneficiaries_returnsMappedList() {
         Beneficiary second = new Beneficiary();
-        second.setBeneficiaryId(UUID.randomUUID());
+        second.setBeneficiaryId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         second.setName("Alice");
         second.setAccountNumber("ACC999888");
         second.setBankName("Axis");
@@ -172,7 +171,7 @@ class BeneficiaryServiceTest {
 
     @Test
     void getBeneficiary_unknownId_throwsNotFoundException() {
-        UUID unknownId = UUID.randomUUID();
+        String unknownId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(repository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getBeneficiary(unknownId))

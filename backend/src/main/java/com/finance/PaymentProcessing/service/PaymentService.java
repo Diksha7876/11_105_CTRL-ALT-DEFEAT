@@ -8,7 +8,6 @@ import com.finance.PaymentProcessing.model.*;
 import com.finance.PaymentProcessing.repository.*;
 import java.math.BigDecimal;
 import java.util.Comparator;
-import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -155,11 +154,11 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
-    public PaymentResponse getPayment(UUID id) {
+    public PaymentResponse getPayment(String id) {
         return toResponse(find(id));
     }
 
-    public PaymentResponse updateStatus(UUID id, PaymentStatusRequest request) {
+    public PaymentResponse updateStatus(String id, PaymentStatusRequest request) {
         Payment payment = find(id);
         validationService.validateStatusTransition(payment.getStatus(), request.status());
         PaymentStatus old = payment.getStatus();
@@ -176,7 +175,7 @@ public class PaymentService {
                 .map(this::toResponse);
     }
 
-    private Payment find(UUID id) {
+    private Payment find(String id) {
         return paymentRepository.findById(id).orElseThrow(() -> new NotFoundException("Payment not found: " + id));
     }
 
@@ -222,7 +221,7 @@ public class PaymentService {
                         "No active source account available for this payer"));
     }
 
-    private void validateSourceOwnershipAndStatus(BankAccount sourceAccount, UUID payerId) {
+    private void validateSourceOwnershipAndStatus(BankAccount sourceAccount, String payerId) {
         if (sourceAccount.getPayerId() != null && !payerId.equals(sourceAccount.getPayerId())) {
             throw new BadRequestException("INVALID_ACCOUNT", "Source account does not belong to current payer");
         }

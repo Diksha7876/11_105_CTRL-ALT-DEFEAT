@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import AsyncState from "../components/AsyncState";
@@ -47,6 +46,10 @@ function isLuhnValid(digits) {
 
 function normalizeCurrency(currency) {
   return String(currency || "INR").trim().toUpperCase();
+}
+
+function generateIdempotencyKey() {
+  return `idem-${Date.now()}-${Math.floor(100000000 + Math.random() * 900000000)}`;
 }
 
 function convertAmountToInr(amount, currency) {
@@ -249,7 +252,7 @@ function CreatePaymentSection() {
       return;
     }
     setSubmitting(true);
-    const retryKey = idempotencyKey || uuidv4();
+    const retryKey = idempotencyKey || generateIdempotencyKey();
     if (!idempotencyKey) setIdempotencyKey(retryKey);
     const body = {
       amount: Number(form.amount),
@@ -753,7 +756,7 @@ function SourceAccountsSection() {
                 type="button"
                 className="btn-primary whitespace-nowrap"
                 onClick={() =>
-                  setForm((p) => ({ ...p, accountId: crypto.randomUUID() }))
+                  setForm((p) => ({ ...p, accountId: String(100000000 + Math.floor(Math.random() * 900000000)) }))
                 }
               >
                 Generate Unique ID

@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -25,7 +24,7 @@ public class BeneficiaryRepositoryImpl implements BeneficiaryRepository {
 
     private static Beneficiary map(ResultSet rs) throws SQLException {
         Beneficiary b = new Beneficiary();
-        b.setBeneficiaryId(UUID.fromString(rs.getString("beneficiary_id")));
+        b.setBeneficiaryId(rs.getString("beneficiary_id"));
         b.setName(rs.getString("name"));
         b.setAccountNumber(rs.getString("account_number"));
         b.setBankName(rs.getString("bank_name"));
@@ -38,10 +37,10 @@ public class BeneficiaryRepositoryImpl implements BeneficiaryRepository {
     @Override
     public Beneficiary save(Beneficiary beneficiary) {
         if (beneficiary.getBeneficiaryId() == null) {
-            beneficiary.setBeneficiaryId(UUID.randomUUID());
+            beneficiary.setBeneficiaryId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
             jdbc.update(
                 "INSERT INTO beneficiaries (beneficiary_id, name, account_number, bank_name, ifsc_code, email, phone) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                beneficiary.getBeneficiaryId().toString(),
+                beneficiary.getBeneficiaryId(),
                 beneficiary.getName(),
                 beneficiary.getAccountNumber(),
                 beneficiary.getBankName(),
@@ -58,18 +57,18 @@ public class BeneficiaryRepositoryImpl implements BeneficiaryRepository {
                 beneficiary.getIfscCode(),
                 beneficiary.getEmail(),
                 beneficiary.getPhone(),
-                beneficiary.getBeneficiaryId().toString()
+                beneficiary.getBeneficiaryId()
             );
         }
         return beneficiary;
     }
 
     @Override
-    public Optional<Beneficiary> findById(UUID id) {
+    public Optional<Beneficiary> findById(String id) {
         List<Beneficiary> results = jdbc.query(
             "SELECT * FROM beneficiaries WHERE beneficiary_id = ?",
             ROW_MAPPER,
-            id.toString()
+            id
         );
         return results.isEmpty() ? Optional.empty() : Optional.of(results.get(0));
     }
@@ -80,11 +79,11 @@ public class BeneficiaryRepositoryImpl implements BeneficiaryRepository {
     }
 
     @Override
-    public boolean existsById(UUID id) {
+    public boolean existsById(String id) {
         Integer count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM beneficiaries WHERE beneficiary_id = ?",
             Integer.class,
-            id.toString()
+            id
         );
         return count != null && count > 0;
     }

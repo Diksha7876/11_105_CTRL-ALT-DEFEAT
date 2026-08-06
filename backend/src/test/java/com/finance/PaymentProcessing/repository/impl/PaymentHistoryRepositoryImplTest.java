@@ -14,7 +14,6 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -26,12 +25,12 @@ class PaymentHistoryRepositoryImplTest {
     @Mock private JdbcTemplate jdbc;
     @InjectMocks private PaymentHistoryRepositoryImpl repository;
 
-    private UUID paymentId;
+    private String paymentId;
     private PaymentHistory history;
 
     @BeforeEach
     void setUp() {
-        paymentId = UUID.randomUUID();
+        paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         history = new PaymentHistory();
         history.setPaymentId(paymentId);
         history.setOldStatus(PaymentStatus.CREATED);

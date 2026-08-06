@@ -1,13 +1,12 @@
 package com.finance.PaymentProcessing.dto;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 public record BankAccountResponse(
-	UUID accountId,
+	String accountId,
 	String accountNumber,
 	String accountHolderName,
-	UUID payerId,
+	String payerId,
 	String accountType,
 	BigDecimal balanceInInr,
 	BigDecimal maxTransactionLimitInInr,

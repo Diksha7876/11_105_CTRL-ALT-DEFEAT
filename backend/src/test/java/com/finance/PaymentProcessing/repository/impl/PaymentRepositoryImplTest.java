@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -29,12 +28,12 @@ class PaymentRepositoryImplTest {
     @Mock private JdbcTemplate jdbc;
     @InjectMocks private PaymentRepositoryImpl repository;
 
-    private UUID paymentId;
+    private String paymentId;
     private Payment payment;
 
     @BeforeEach
     void setUp() {
-        paymentId = UUID.randomUUID();
+        paymentId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         payment = new Payment();
         payment.setPaymentId(paymentId);
         payment.setAmount(new BigDecimal("500.00"));
@@ -44,7 +43,7 @@ class PaymentRepositoryImplTest {
         payment.setVersion(0L);
         payment.setPaymentType(PaymentType.BENEFICIARY_TRANSFER);
         payment.setPaymentMethod(PaymentMethod.NET_BANKING);
-        payment.setPayerId(UUID.randomUUID());
+        payment.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         payment.setIdempotencyKey("idem-001");
     }
 
@@ -61,7 +60,7 @@ class PaymentRepositoryImplTest {
         newPayment.setStatus(PaymentStatus.SENT);
         newPayment.setPaymentType(PaymentType.BENEFICIARY_TRANSFER);
         newPayment.setPaymentMethod(PaymentMethod.NET_BANKING);
-        newPayment.setPayerId(UUID.randomUUID());
+        newPayment.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         newPayment.setIdempotencyKey("key-new");
 
         repository.save(newPayment);
@@ -81,7 +80,7 @@ class PaymentRepositoryImplTest {
         newPayment.setStatus(PaymentStatus.SENT);
         newPayment.setPaymentType(PaymentType.BENEFICIARY_TRANSFER);
         newPayment.setPaymentMethod(PaymentMethod.NET_BANKING);
-        newPayment.setPayerId(UUID.randomUUID());
+        newPayment.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         newPayment.setIdempotencyKey("key-new");
 
         repository.save(newPayment);
@@ -103,7 +102,7 @@ class PaymentRepositoryImplTest {
         newPayment.setStatus(PaymentStatus.SENT);
         newPayment.setPaymentType(PaymentType.BENEFICIARY_TRANSFER);
         newPayment.setPaymentMethod(PaymentMethod.NET_BANKING);
-        newPayment.setPayerId(UUID.randomUUID());
+        newPayment.setPayerId(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId());
         newPayment.setIdempotencyKey("key-new");
 
         assertThat(repository.save(newPayment)).isSameAs(newPayment);
@@ -186,7 +185,7 @@ class PaymentRepositoryImplTest {
         when(jdbc.query(anyString(), any(RowMapper.class), anyString()))
                 .thenReturn(List.of());
 
-        assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+        assertThat(repository.findById(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId())).isEmpty();
     }
 
     @SuppressWarnings("unchecked")
@@ -251,7 +250,7 @@ class PaymentRepositoryImplTest {
     @SuppressWarnings("unchecked")
     @Test
     void findByPayerIdAndInvoiceId_found_returnsOptional() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(jdbc.query(anyString(), any(RowMapper.class), anyString(), anyString()))
                 .thenReturn(List.of(payment));
 
@@ -262,7 +261,7 @@ class PaymentRepositoryImplTest {
     @SuppressWarnings("unchecked")
     @Test
     void findByPayerIdAndInvoiceId_notFound_returnsEmpty() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(jdbc.query(anyString(), any(RowMapper.class), anyString(), anyString()))
                 .thenReturn(List.of());
 
@@ -272,7 +271,7 @@ class PaymentRepositoryImplTest {
     @SuppressWarnings("unchecked")
     @Test
     void findByPayerIdAndInvoiceId_passesPayerIdAsStringAndInvoiceId() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         when(jdbc.query(anyString(), any(RowMapper.class), anyString(), anyString()))
                 .thenReturn(List.of());
 

@@ -384,7 +384,7 @@ function IncomingCreateSection({ onCreated }) {
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, destinationAccountId: event.target.value }))
               }
-              placeholder="UUID"
+              placeholder="9-digit ID"
             />
           </label>
 

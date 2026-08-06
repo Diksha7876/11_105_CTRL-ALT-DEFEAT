@@ -13,7 +13,6 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -25,12 +24,12 @@ class BeneficiaryRepositoryImplTest {
     @Mock private JdbcTemplate jdbc;
     @InjectMocks private BeneficiaryRepositoryImpl repository;
 
-    private UUID beneficiaryId;
+    private String beneficiaryId;
     private Beneficiary beneficiary;
 
     @BeforeEach
     void setUp() {
-        beneficiaryId = UUID.randomUUID();
+        beneficiaryId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         beneficiary = new Beneficiary();
         beneficiary.setBeneficiaryId(beneficiaryId);
         beneficiary.setName("John Doe");
@@ -119,7 +118,7 @@ class BeneficiaryRepositoryImplTest {
         when(jdbc.query(anyString(), any(RowMapper.class), anyString()))
                 .thenReturn(List.of());
 
-        assertThat(repository.findById(UUID.randomUUID())).isEmpty();
+        assertThat(repository.findById(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId())).isEmpty();
     }
 
     @SuppressWarnings("unchecked")

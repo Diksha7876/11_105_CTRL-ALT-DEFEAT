@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import AsyncState from "../components/AsyncState";
@@ -16,6 +15,10 @@ const initialForm = {
   paymentType: "BILL_PAYMENT",
   invoiceId: "",
 };
+
+function generateIdempotencyKey() {
+  return `idem-${Date.now()}-${Math.floor(100000000 + Math.random() * 900000000)}`;
+}
 
 export default function CreatePaymentPage() {
   const { currentUser } = useCurrentUser();
@@ -125,7 +128,7 @@ export default function CreatePaymentPage() {
     }
 
     setSubmitting(true);
-    const retryKey = idempotencyKey || uuidv4();
+    const retryKey = idempotencyKey || generateIdempotencyKey();
     if (!idempotencyKey) {
       setIdempotencyKey(retryKey);
     }

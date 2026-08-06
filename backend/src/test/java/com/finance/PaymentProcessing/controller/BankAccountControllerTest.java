@@ -20,7 +20,6 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,7 +28,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class BankAccountControllerTest {
 
-    private static final UUID DEFAULT_PAYER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final String DEFAULT_PAYER_ID = "111111111";
 
     @Mock
     private BankAccountRepository repository;
@@ -37,19 +36,19 @@ class BankAccountControllerTest {
     @InjectMocks
     private BankAccountController controller;
 
-    private UUID accountId;
+    private String accountId;
 
     @BeforeEach
     void setUp() {
-        accountId = UUID.randomUUID();
+        accountId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private BankAccount savedAccount(UUID id, String accountNumber, String holderName,
-            UUID payerId, String accountType, BigDecimal balance) {
+    private BankAccount savedAccount(String id, String accountNumber, String holderName,
+            String payerId, String accountType, BigDecimal balance) {
         BankAccount a = new BankAccount();
         a.setAccountId(id);
         a.setAccountNumber(accountNumber);
@@ -62,7 +61,7 @@ class BankAccountControllerTest {
     }
 
     private BankAccountRequest request(String accountNumber, String holderName,
-            UUID payerId, BigDecimal openingBalance, String accountType) {
+            String payerId, BigDecimal openingBalance, String accountType) {
         return new BankAccountRequest(accountNumber, holderName, payerId, openingBalance, null, accountType);
     }
 
@@ -124,7 +123,7 @@ class BankAccountControllerTest {
 
     @Test
     void create_explicit_payerId_balance_accountType_storedCorrectly() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         BankAccountRequest req = request("ACC999888", "Bob", payerId, new BigDecimal("10000.00"), "CURRENT");
         when(repository.findAll()).thenReturn(List.of());
         when(repository.save(any())).thenAnswer(inv -> {
@@ -164,7 +163,7 @@ class BankAccountControllerTest {
 
     @Test
     void create_responseBodyMapsAllFields() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         BankAccountRequest req = request("ACCSALARY1", "Dave", payerId, new BigDecimal("5000"), "SALARY");
         when(repository.findAll()).thenReturn(List.of());
         when(repository.save(any())).thenAnswer(inv -> {
@@ -191,8 +190,8 @@ class BankAccountControllerTest {
 
     @Test
     void create_duplicateAccountNumber_throwsBadRequestException() {
-        BankAccount existing = savedAccount(UUID.randomUUID(), "ACC123456", "Eve",
-                UUID.randomUUID(), "SAVINGS", new BigDecimal("1000"));
+        BankAccount existing = savedAccount(com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), "ACC123456", "Eve",
+                com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), "SAVINGS", new BigDecimal("1000"));
         when(repository.findAll()).thenReturn(List.of(existing));
 
         BankAccountRequest req = request("ACC123456", "Frank", null, null, null);
@@ -293,10 +292,10 @@ class BankAccountControllerTest {
 
     @Test
     void list_multipleAccounts_returnsMappedResponses() {
-        UUID id1 = UUID.randomUUID();
-        UUID id2 = UUID.randomUUID();
-        BankAccount a1 = savedAccount(id1, "ACC001", "Karl", UUID.randomUUID(), "SAVINGS", new BigDecimal("1000"));
-        BankAccount a2 = savedAccount(id2, "ACC002", "Lena", UUID.randomUUID(), "CURRENT", new BigDecimal("2000"));
+        String id1 = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        String id2 = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
+        BankAccount a1 = savedAccount(id1, "ACC001", "Karl", com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), "SAVINGS", new BigDecimal("1000"));
+        BankAccount a2 = savedAccount(id2, "ACC002", "Lena", com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId(), "CURRENT", new BigDecimal("2000"));
         when(repository.findAll()).thenReturn(List.of(a1, a2));
 
         List<BankAccountResponse> result = controller.list();
@@ -310,7 +309,7 @@ class BankAccountControllerTest {
 
     @Test
     void list_responseFieldsMappedCorrectly() {
-        UUID payerId = UUID.randomUUID();
+        String payerId = com.finance.PaymentProcessing.util.IdGenerator.generate9DigitId();
         BankAccount account = savedAccount(accountId, "ACCTEST", "Mike", payerId, "SALARY", new BigDecimal("9999"));
         when(repository.findAll()).thenReturn(List.of(account));
 
