@@ -29,7 +29,6 @@ services:
       - mysql
 
     environment:
-      SPRING_PROFILES_ACTIVE: docker
       DB_URL: jdbc:mysql://mysql:3306/paymentprocessing
       DB_USER: root
       DB_PASS: n3u3da!
