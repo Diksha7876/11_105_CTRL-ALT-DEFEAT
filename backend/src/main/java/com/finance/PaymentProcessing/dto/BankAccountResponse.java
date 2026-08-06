@@ -10,5 +10,6 @@ public record BankAccountResponse(
 	UUID payerId,
 	String accountType,
 	BigDecimal balanceInInr,
+	BigDecimal maxTransactionLimitInInr,
 	boolean active) {
 }

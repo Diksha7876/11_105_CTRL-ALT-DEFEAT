@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     payer_id            CHAR(36)        NULL,
     account_type        VARCHAR(30)     NOT NULL DEFAULT 'SAVINGS',
     balance_in_inr      DECIMAL(19,2)   NOT NULL DEFAULT 0.00,
+    max_transaction_limit_in_inr DECIMAL(19,2) NOT NULL DEFAULT 1000000.00,
     active              TINYINT(1)      NOT NULL DEFAULT 1,
     PRIMARY KEY (account_id),
     UNIQUE KEY uk_bank_accounts_account_number (account_number)
@@ -27,6 +28,23 @@ SET @sql = (
         ),
         'SELECT 1',
         'ALTER TABLE bank_accounts ADD COLUMN payer_id CHAR(36) NULL'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'bank_accounts'
+              AND column_name = 'max_transaction_limit_in_inr'
+        ),
+        'SELECT 1',
+        'ALTER TABLE bank_accounts ADD COLUMN max_transaction_limit_in_inr DECIMAL(19,2) NOT NULL DEFAULT 1000000.00'
     )
 );
 PREPARE stmt FROM @sql;

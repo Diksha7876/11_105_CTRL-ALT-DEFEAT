@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class BankAccountController {
     private static final UUID DEFAULT_PAYER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final Set<String> SUPPORTED_ACCOUNT_TYPES = Set.of("SAVINGS", "CURRENT", "SALARY");
+    private static final BigDecimal DEFAULT_MAX_TXN_LIMIT_INR = new BigDecimal("1000000.00");
 
     private final BankAccountRepository repository;
 
@@ -38,6 +39,13 @@ public class BankAccountController {
             throw new BadRequestException("INVALID_BALANCE", "Opening balance cannot be negative");
         }
         account.setBalanceInInr(openingBalance);
+        BigDecimal maxTransactionLimit = request.maxTransactionLimitInInr() != null
+            ? request.maxTransactionLimitInInr()
+            : DEFAULT_MAX_TXN_LIMIT_INR;
+        if (maxTransactionLimit.signum() <= 0) {
+            throw new BadRequestException("INVALID_LIMIT", "Max transaction limit must be greater than 0");
+        }
+        account.setMaxTransactionLimitInInr(maxTransactionLimit);
         String accountType = request.accountType() == null ? "SAVINGS" : request.accountType().trim().toUpperCase();
         if (!SUPPORTED_ACCOUNT_TYPES.contains(accountType)) {
             throw new BadRequestException("INVALID_ACCOUNT_TYPE", "Supported account types: SAVINGS, CURRENT, SALARY");
@@ -45,6 +53,20 @@ public class BankAccountController {
         account.setAccountType(accountType);
         account = repository.save(account);
         return ResponseEntity.created(URI.create("/api/accounts/" + account.getAccountId())).body(toResponse(account));
+    }
+
+    @PatchMapping("/{accountId}/limit")
+    public ResponseEntity<BankAccountResponse> updateTransactionLimit(
+            @PathVariable UUID accountId,
+            @Valid @RequestBody BankAccountLimitUpdateRequest request) {
+        BankAccount account = repository.findById(accountId)
+            .orElseThrow(() -> new BadRequestException("INVALID_ACCOUNT", "Source account not found: " + accountId));
+        if (request.maxTransactionLimitInInr().signum() <= 0) {
+            throw new BadRequestException("INVALID_LIMIT", "Max transaction limit must be greater than 0");
+        }
+        account.setMaxTransactionLimitInInr(request.maxTransactionLimitInInr());
+        account = repository.save(account);
+        return ResponseEntity.ok(toResponse(account));
     }
 
     @GetMapping
@@ -60,6 +82,7 @@ public class BankAccountController {
             a.getPayerId(),
             a.getAccountType(),
             a.getBalanceInInr(),
+            a.getMaxTransactionLimitInInr(),
             a.isActive());
     }
 }
