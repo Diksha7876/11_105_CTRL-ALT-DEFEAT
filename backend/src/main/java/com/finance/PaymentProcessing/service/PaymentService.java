@@ -75,10 +75,11 @@ public class PaymentService {
                             ? request.paymentType()
                             : PaymentType.BENEFICIARY_TRANSFER;
 
-                    validationService.validatePaymentDetails(paymentType, request.invoiceId());
-                    String invoiceId = paymentType == PaymentType.BILL_PAYMENT && request.invoiceId() != null
-                            ? request.invoiceId().trim()
-                            : null;
+                    validationService.validatePaymentDetails(paymentType, request.paymentMethod(), request.invoiceId());
+                    String invoiceId = request.invoiceId() != null ? request.invoiceId().trim() : null;
+                    if (invoiceId != null && invoiceId.isBlank()) {
+                        invoiceId = null;
+                    }
                     if (invoiceId != null
                             && request.payerId() != null
                             && paymentRepository.findByPayerIdAndInvoiceId(request.payerId(), invoiceId).isPresent()) {

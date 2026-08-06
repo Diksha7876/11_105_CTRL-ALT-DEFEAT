@@ -195,13 +195,13 @@ class ValidationServiceTest {
 
     @Test
     void validatePaymentDetails_nullType_doesNotThrow() {
-        assertThatCode(() -> service.validatePaymentDetails(null, null)).doesNotThrowAnyException();
-        assertThatCode(() -> service.validatePaymentDetails(null, "INV-001")).doesNotThrowAnyException();
+        assertThatCode(() -> service.validatePaymentDetails(null, PaymentMethod.NET_BANKING, null)).doesNotThrowAnyException();
+        assertThatCode(() -> service.validatePaymentDetails(null, PaymentMethod.CARD, "INV-001")).doesNotThrowAnyException();
     }
 
     @Test
     void validatePaymentDetails_billPaymentWithInvoiceId_doesNotThrow() {
-        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BILL_PAYMENT, "INV-001"))
+        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BILL_PAYMENT, PaymentMethod.NET_BANKING, "INV-001"))
                 .doesNotThrowAnyException();
     }
 
@@ -209,22 +209,42 @@ class ValidationServiceTest {
     @NullAndEmptySource
     @ValueSource(strings = {"   "})
     void validatePaymentDetails_billPaymentBlankOrNullInvoiceId_throwsBadRequest(String invoiceId) {
-        assertThatThrownBy(() -> service.validatePaymentDetails(PaymentType.BILL_PAYMENT, invoiceId))
+        assertThatThrownBy(() -> service.validatePaymentDetails(PaymentType.BILL_PAYMENT, PaymentMethod.NET_BANKING, invoiceId))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("invoiceId is required");
     }
 
     @Test
-    void validatePaymentDetails_beneficiaryTransferNullInvoiceId_doesNotThrow() {
-        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, null))
+    void validatePaymentDetails_beneficiaryTransferNetBankingNullInvoiceId_doesNotThrow() {
+        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, PaymentMethod.NET_BANKING, null))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void validatePaymentDetails_beneficiaryTransferWithInvoiceId_throwsBadRequest() {
-        assertThatThrownBy(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, "INV-001"))
+    void validatePaymentDetails_beneficiaryTransferNetBankingWithInvoiceId_throwsBadRequest() {
+        assertThatThrownBy(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, PaymentMethod.NET_BANKING, "INV-001"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("must not be supplied");
+    }
+
+    @Test
+    void validatePaymentDetails_beneficiaryTransferCardWithInvoiceId_doesNotThrow() {
+        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, PaymentMethod.CARD, "INV-001"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void validatePaymentDetails_beneficiaryTransferUpiWithInvoiceId_doesNotThrow() {
+        assertThatCode(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, PaymentMethod.UPI, "INV-001"))
+                .doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest(name = "{0} requires invoiceId")
+    @CsvSource({"CARD", "UPI"})
+    void validatePaymentDetails_cardAndUpiWithoutInvoiceId_throwsBadRequest(PaymentMethod paymentMethod) {
+        assertThatThrownBy(() -> service.validatePaymentDetails(PaymentType.BENEFICIARY_TRANSFER, paymentMethod, "   "))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("invoiceId is required for card and UPI payments");
     }
 
     // =========================================================================
