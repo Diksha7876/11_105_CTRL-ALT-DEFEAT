@@ -49,7 +49,7 @@ class BankAccountRepositoryImplTest {
     // =========================================================================
 
     @Test
-    void save_newAccount_assignsUuidBeforeInsert() {
+    void save_newAccount_assignsGeneratedIdBeforeInsert() {
         BankAccount newAccount = new BankAccount();
         newAccount.setAccountNumber("ACCNEW");
         newAccount.setAccountHolderName("Bob");
@@ -73,7 +73,7 @@ class BankAccountRepositoryImplTest {
         repository.save(newAccount);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).update(sqlCaptor.capture(), any(), any(), any(), any(), any(), any(), any());
+        verify(jdbc).update(sqlCaptor.capture(), any(), any(), any(), any(), any(), any(), any(), any());
         assertThat(sqlCaptor.getValue()).containsIgnoringCase("INSERT INTO bank_accounts");
     }
 
@@ -101,9 +101,9 @@ class BankAccountRepositoryImplTest {
 
         repository.save(newAccount);
 
-        // Verify update was called; null payerId should be passed as null (4th arg)
+        // Insert args: id, accountNumber, accountHolderName, payerId, accountType, balance, maxLimit, active
         ArgumentCaptor<Object> arg4 = ArgumentCaptor.forClass(Object.class);
-        verify(jdbc).update(anyString(), any(), any(), any(), arg4.capture(), any(), any(), any());
+        verify(jdbc).update(anyString(), any(), any(), any(), arg4.capture(), any(), any(), any(), any());
         assertThat(arg4.getValue()).isNull();
     }
 
@@ -117,10 +117,10 @@ class BankAccountRepositoryImplTest {
 
         repository.save(newAccount);
 
-        ArgumentCaptor<Object> balanceCaptor = ArgumentCaptor.forClass(Object.class);
-        // balance is the 6th argument: id, number, holder, payerId, type, balance, active
-        verify(jdbc).update(anyString(), any(), any(), any(), any(), any(), balanceCaptor.capture(), any());
-        assertThat(balanceCaptor.getValue()).isEqualTo(BigDecimal.ZERO);
+        ArgumentCaptor<Object[]> argsCaptor = ArgumentCaptor.forClass(Object[].class);
+        // Varargs are passed as a single Object[]: [id, number, holder, payerId, type, balance, maxLimit, active]
+        verify(jdbc).update(anyString(), argsCaptor.capture());
+        assertThat(argsCaptor.getValue()[5]).isEqualTo(BigDecimal.ZERO);
     }
 
     // =========================================================================
@@ -132,7 +132,7 @@ class BankAccountRepositoryImplTest {
         repository.save(account);
 
         ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).update(sqlCaptor.capture(), any(), any(), any(), any(), any(), any(), any());
+        verify(jdbc).update(sqlCaptor.capture(), any(), any(), any(), any(), any(), any(), any(), any());
         assertThat(sqlCaptor.getValue()).containsIgnoringCase("UPDATE bank_accounts");
     }
 
@@ -149,8 +149,8 @@ class BankAccountRepositoryImplTest {
 
         // Last argument to UPDATE is the account_id for WHERE clause
         ArgumentCaptor<Object> lastArg = ArgumentCaptor.forClass(Object.class);
-        verify(jdbc).update(anyString(), any(), any(), any(), any(), any(), any(), lastArg.capture());
-        assertThat(lastArg.getValue()).isEqualTo(accountId.toString());
+        verify(jdbc).update(anyString(), any(), any(), any(), any(), any(), any(), any(), lastArg.capture());
+        assertThat(lastArg.getValue()).isEqualTo(accountId);
     }
 
     // =========================================================================
